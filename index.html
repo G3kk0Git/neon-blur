@@ -1113,9 +1113,9 @@ function mkPeer(onMsg,onOpen,onClose){
   const pc=new RTCPeerConnection(ICE),rc=pc.createDataChannel('r',{negotiated:true,id:0}),uc=pc.createDataChannel('u',{negotiated:true,id:1,ordered:false,maxRetransmits:0});
   const p={pc,rc,uc,open:false,lastIn:0,onMsg,onOpen,onClose};
   rc.onmessage=e=>{try{onMsg(JSON.parse(e.data),p)}catch(x){}};uc.onmessage=rc.onmessage;
-  rc.onopen=()=>{p.open=true;onOpen(p)};
-  pc.onconnectionstatechange=()=>{if(['failed','closed','disconnected'].includes(pc.connectionState)){const was=p.open;p.open=false;if(was)onClose(p)}};
-  rc.onclose=()=>{if(p.open){p.open=false;onClose(p)}};
+  rc.onopen=()=>{if(p.relay)return;p.open=true;nlog('WebRTC offen');onOpen(p)};
+  pc.onconnectionstatechange=()=>{if(p.relay)return;nlog('rtc '+pc.connectionState);if(['failed','closed','disconnected'].includes(pc.connectionState)){const was=p.open;p.open=false;if(was)onClose(p)}};
+  rc.onclose=()=>{if(p.relay)return;if(p.open){p.open=false;onClose(p)}};
   return p}
 const sendCh=(ch,o)=>{try{if(ch&&ch.readyState==='open')ch.send(JSON.stringify(o))}catch(e){}};
 function netSendR(o){if(net.role==='guest'&&net.up)sendCh(net.up.rc,o)}
@@ -1162,7 +1162,7 @@ async function guestJoin(str){
   return encCode(p.pc.localDescription.toJSON())}
 function applyOff(){net.applying=false;nPl=1;init();state='menu'}
 function guestGot(m){
-  if(m.t==='hi'){net.role='guest';net.slot=m.slot|0;nPl=1;npClose()}
+  if(m.t==='hi'){nlog('Host-Hallo (hi) erhalten');net.role='guest';net.slot=m.slot|0;nPl=1;npClose()}
   else if(m.t==='init'){net.applying=true;if(m.sel!==sel)loadTrack(m.sel);else init();m.mis.forEach((v,i)=>{if(cars[i])cars[i].mi=v});net.applying=false;net.hp0=null}
   else if(m.t==='s')netApply(m)}
 function netApply(m){
@@ -1219,6 +1219,7 @@ function renderNet(){
     cd.appendChild(H$('div','',on?'<div style="font-size:40px">✅</div><b style="font-size:18px">Verbunden!</b>':'<div style="font-size:40px">🏁</div><b style="font-size:18px">Verbindung wird aufgebaut …</b>'));
     cd.appendChild(H$('div','st',(net.roomMsg||'').replace(/</g,'&lt;')));
     cd.appendChild(btn(on?'Los – Auto & Strecke wählen':'Abbrechen',()=>{npClose()},on?'':'g'));
+    if(net.log&&net.log.length){const lg=H$('div','st','');lg.style.cssText='text-align:left;font:11px monospace;opacity:.7;margin-top:8px;white-space:pre-wrap';lg.textContent=net.log.join('\n');cd.appendChild(lg)}
     npEl.appendChild(cd);return}
   if(npView==='host'){
     npEl.appendChild(npHead('SPIEL HOSTEN'));
@@ -1273,6 +1274,8 @@ function sigStart(){
   const bad=e=>{SIG.ok=false;if(e)SIG.err=String(e.message||e);
     if(++SIG.fails>=3&&!SIG.everOk){SIG.fails=0;try{c.end(true)}catch(x){}SIG.c=null;SIG.bi++;SIG.err='';sigStart()}lobRender()};
   c.on('error',bad);c.on('close',()=>bad())}
+const T0=Date.now();
+function nlog(t){net.log=net.log||[];net.log.push(((Date.now()-T0)/1000).toFixed(0)+'s '+t);if(net.log.length>14)net.log.shift();if(npEl.style.display==='block')try{renderNet()}catch(e){}}
 // ---- Raum (Host) ----
 function openRoom(){
   if(net.room||net.roomBusy)return;
@@ -1287,18 +1290,18 @@ async function roomJoin(m){
   let sl=net.slotOf[m.from];
   if(!sl){for(let q=1;q<=3;q++)if(!(net.peers[q]&&net.peers[q].open)&&!(net.pend&&net.pend[q])){sl=q;break}}
   if(!sl){sigPub(NS+'u/'+m.from,{t:'no',from:SIG.id,why:'– der Raum ist voll'},false,1);return}
-  net.slotOf[m.from]=sl;net.pend[sl]=1;net.hostSlots=Math.max(net.hostSlots||1,sl);
+  nlog('Beitritt von '+(m.name||'?')+' → Platz '+sl);net.slotOf[m.from]=sl;net.pend[sl]=1;net.hostSlots=Math.max(net.hostSlots||1,sl);
   try{const code=await hostInvite(sl);sigPub(NS+'u/'+m.from,{t:'offer',from:SIG.id,slot:sl,code},false,1);net.roomMsg=(m.name||'Freund')+' verbindet sich …';renderNet()}
   catch(e){net.roomMsg='Fehler: '+(e&&e.message||e);net.pend[sl]=0;renderNet()}}
 async function roomAnswer(m){
-  const sl=m.slot|0;if(!net.peers[sl])return;
+  const sl=m.slot|0;if(!net.peers[sl])return;nlog('Antwort erhalten');
   try{await hostAccept(sl,m.code)}catch(e){net.roomMsg='Fehler: '+(e&&e.message||e);renderNet();return}
   const iv=setInterval(()=>{const p=net.peers[sl];if(p&&p.open){clearInterval(iv);net.pend[sl]=0;net.roomMsg='● Freund verbunden'+(p.relay?' (über Relay)':'')+'! Wähle jetzt Auto und Strecke. Weitere Freunde können denselben Link nutzen.';if(npView==='wait'&&npEl.style.display==='block'){renderNet();setTimeout(()=>{if(npView==='wait')npClose()},1800)}else renderNet()}},400);
   setTimeout(()=>clearInterval(iv),SIG.relayMs+9000);
   setTimeout(()=>{const p=net.peers[sl];if(p&&!p.open&&!p.relay)goRelay(p,'host',SIG.id,sl)},SIG.relayMs+1500)}
 // ---- Relay-Reserve: falls die direkte Verbindung nicht klappt, laufen die Daten ueber den Broker ----
 function goRelay(p,role,hostId,slot){
-  if(p.open||p.relay)return;p.relay=true;try{p.pc.close()}catch(e){}
+  if(p.open||p.relay)return;p.relay=true;nlog('Relay an ('+role+')');try{p.pc.onconnectionstatechange=null;p.rc.onclose=null;p.rc.onopen=null;p.pc.close()}catch(e){}
   const base=NS+'g/'+hostId+'/'+slot,out=base+(role==='host'?'/d':'/u'),inn=base+(role==='host'?'/u':'/d');
   p.rcSub=sigSub(inn,(t,m)=>{try{p.onMsg(JSON.parse(m),p)}catch(e){}});
   const mk=(qos,gap)=>({readyState:'open',_t:0,send(str){const n=performance.now();if(gap&&n-this._t<gap)return;this._t=n;sigPub(out,str,false,qos)}});
@@ -1318,7 +1321,7 @@ function doJoin(code,st,hostId){
   let h;const to=setTimeout(()=>{sigUnsub(h);st.className='st err';st.textContent='Raum nicht gefunden – Code prüfen oder den Host bitten, ihn zu öffnen.'},9000);
   h=sigSub(NS+'room/'+code,(t,s)=>{if(!s)return;try{const o=JSON.parse(s);clearTimeout(to);sigUnsub(h);go(o.host)}catch(e){}})}
 async function guestOffer(m){
-  try{const ans=await guestJoin(m.code);
+  try{nlog('Angebot erhalten');const ans=await guestJoin(m.code);nlog('Antwort gesendet');
     sigPub(NS+'u/'+m.from,{t:'answer',from:SIG.id,slot:m.slot,code:ans},false,1);
     const p=net.up;if(p){p.onMsgSet=1;setTimeout(()=>{if(net.up===p&&!p.open&&!p.relay)goRelay(p,'guest',m.from,m.slot)},SIG.relayMs)}}
   catch(e){lob.msg='Fehler: '+(e&&e.message||e);lobRender()}}
@@ -1419,6 +1422,7 @@ function lobCard(){
       const b=btn('Zusammen fahren',()=>lobInvite(u));b.style.cssText='background:#7cff6b;color:#04210f;border:0;border-radius:10px;padding:8px 12px;font:800 13px system-ui';if(u.busy){b.disabled=true;b.style.opacity='.4'}r.appendChild(b);card.appendChild(r)})}
   else card.appendChild(H$('div','st',SIG.ok?'Noch niemand sonst da. Sobald dein Freund die Seite öffnet, erscheint er hier.':''));
   if(lob.msg)card.appendChild(H$('div','st',''+lob.msg.replace(/</g,'&lt;')));
+  if(net.log&&net.log.length){const lg=H$('div','st','');lg.style.cssText='font:11px monospace;opacity:.7;white-space:pre-wrap';lg.textContent=net.log.slice(-6).join('\n');card.appendChild(lg)}
   const dg=H$('div','st','Server: '+(SIG.broker||'–')+(SIG.ok?' ✓':' ✗')+(SIG.err?' · '+SIG.err.replace(/</g,'&lt;'):''));dg.style.opacity='.6';card.appendChild(dg);
   return card}
 function hostCard(sl){
