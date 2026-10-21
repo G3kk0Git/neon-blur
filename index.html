@@ -1298,7 +1298,7 @@ async function roomJoin(m){
   if(!sl){for(let q=1;q<=3;q++)if(!(net.peers[q]&&net.peers[q].open)&&!(net.pend&&net.pend[q])){sl=q;break}}
   if(!sl){sigPub(NS+'u/'+m.from,{t:'no',from:SIG.id,why:'– der Raum ist voll'},false,1);return}
   nlog('Beitritt von '+(m.name||'?')+' → Platz '+sl);net.slotOf[m.from]=sl;net.pend[sl]=1;net.hostSlots=Math.max(net.hostSlots||1,sl);
-  try{const code=await hostInvite(sl);sigPub(NS+'u/'+m.from,{t:'offer',from:SIG.id,slot:sl,code},false,1);net.roomMsg=(m.name||'Freund')+' verbindet sich …';renderNet()}
+  try{const code=await hostInvite(sl);sigPub(NS+'u/'+m.from,{t:'offer',from:SIG.id,slot:sl,code},false,1);net.roomMsg=String(m.name||'Freund').slice(0,14)+' verbindet sich …';renderNet()}
   catch(e){net.roomMsg='Fehler: '+(e&&e.message||e);net.pend[sl]=0;renderNet()}}
 async function roomAnswer(m){
   const sl=m.slot|0;if(!net.peers[sl])return;nlog('Antwort erhalten');
@@ -1342,7 +1342,7 @@ function onInbox(t,s){
   else if(m.t==='answer')roomAnswer(m)}
 function roomCard(){
   const card=H$('div','card');card.appendChild(H$('div','ch','<b>Freund einladen</b><span class="chip '+(net.room?'ok':'')+'">'+(net.room?'● Raum offen':'○ nicht offen')+'</span>'));
-  const st=H$('div','st',net.roomMsg||'');
+  const st=H$('div','st','');st.textContent=net.roomMsg||'';
   if(!net.room){
     card.appendChild(btn('Raum öffnen',()=>{openRoom();renderNet()}));
   }else{
@@ -1364,7 +1364,7 @@ function joinRoomCard(){
   if(npAuto){const c=npAuto;npAuto=null;inp1.value=c;let n=0;const tr=()=>{if(SIG.ok||n++>60)doJoin(c,st);else setTimeout(tr,400)};setTimeout(tr,200)}
   return card}
 // ---- Lobby: alle, die gerade auf der Seite sind ----
-const lob={users:{},list:[],name:'',inv:null,msg:'',waitInv:null,started:false};
+const lob={users:Object.create(null),list:[],name:'',inv:null,msg:'',waitInv:null,started:false};
 let lobSt={set textContent(v){lob.msg=v;lobRender()},set className(v){}};
 try{lob.name=localStorage.getItem('nb_name')||''}catch(e){}
 lob.named=!!lob.name;
