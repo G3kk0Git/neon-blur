@@ -14,121 +14,143 @@
 :root{
   --bg:#0b0a12; --panel:#15131f; --panel2:#1d1a2b; --line:#2c2840;
   --text:#ece9f7; --dim:#9a94b5; --accent:#7cf0d0; --accent2:#b18cff; --warn:#ff7a90;
-  --radius:12px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-body{padding:max(12px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));max-width:980px;margin:0 auto;user-select:none;-webkit-user-select:none}
-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-header h1{font-size:20px;margin:0;letter-spacing:.04em;font-weight:700}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none}
+body{user-select:none;-webkit-user-select:none}
+#app{height:100dvh;max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:8px;
+  padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+header{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+header h1{font-size:18px;margin:0 auto 0 0;letter-spacing:.03em;font-weight:700;white-space:nowrap}
 header h1 span{color:var(--accent)}
-header .sp{flex:1}
 button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;touch-action:manipulation}
 button:active{transform:scale(.97)}
 button.on{background:var(--accent);color:#0b0a12;border-color:var(--accent);font-weight:600}
-button.rec.on{background:var(--warn);border-color:var(--warn)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px}
-.display{display:flex;flex-direction:column;gap:8px}
-.chordname{font-size:44px;font-weight:700;letter-spacing:.02em;min-height:54px;text-align:center}
-.chordname small{font-size:16px;color:var(--dim);font-weight:400;display:block}
-canvas#kb{width:100%;height:80px;display:block;border-radius:8px}
-.pads{display:grid;grid-template-columns:1fr;gap:12px}
-@media (min-width:760px){.pads{grid-template-columns:1.1fr 1fr}}
-.label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
-.roots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
-.types{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.pad{position:relative;height:56px;font-size:18px;font-weight:600;border-radius:10px;touch-action:none}
+button.rec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
+header .ib{width:42px;height:38px;padding:0;font-size:16px}
+header #latchBtn{height:38px;padding:0 10px;font-size:14px}
+.viz{position:relative;flex:0 0 auto;height:clamp(130px,28dvh,260px);background:#07060c;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#scope{position:absolute;inset:0;width:100%;height:100%}
+.chordname{position:absolute;left:14px;top:8px;z-index:1;font-size:34px;font-weight:700;letter-spacing:.02em;text-shadow:0 0 6px #07060c,0 0 14px #07060c,0 0 22px rgba(124,240,208,.4);pointer-events:none}
+.chordname small{display:block;font-size:12px;color:var(--dim);font-weight:400;text-shadow:0 0 4px #07060c,0 0 8px #07060c}
+#kb{position:absolute;left:0;right:0;bottom:0;width:100%;height:26px;opacity:.9}
+.steps{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;height:40px;align-items:stretch;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.step{flex:0 0 auto;min-width:52px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:0 10px;display:flex;align-items:center;gap:6px;font-weight:700;font-size:15px}
+.step i{font-style:normal;font-weight:400;font-size:11px;color:var(--dim)}
+.step.sel{border-color:var(--accent2)}
+.step.now{background:var(--accent);color:#0b0a12;border-color:var(--accent)}
+.step.now i{color:#0b0a12}
+.empty{color:var(--dim);font-size:13px;display:flex;align-items:center;padding:0 4px}
+.tabs{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:3px}
+.tabs button{border:0;background:transparent;padding:7px 0;border-radius:8px;color:var(--dim);font-weight:600}
+.tabs button.on{background:var(--panel2);color:var(--text)}
+main{flex:1 1 auto;min-height:0;position:relative}
+.tab{position:absolute;inset:0;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tab.on{display:flex;flex-direction:column;gap:8px}
+#tab-play{overflow:hidden}
+.roots,.types{display:grid;gap:6px;grid-auto-rows:1fr;min-height:0}
+.roots{grid-template-columns:repeat(6,1fr);flex:2 1 0}
+.types{grid-template-columns:repeat(4,1fr);flex:3 1 0}
+.pad{position:relative;min-height:38px;font-size:18px;font-weight:600;border-radius:10px;touch-action:none;padding:0}
 .pad.sharp{background:#100e19}
 .pad.sel{outline:2px solid var(--accent2);outline-offset:-2px}
 .pad.hit{background:var(--accent);color:#0b0a12}
-.pad kbd{position:absolute;right:6px;bottom:4px;font:10px ui-monospace,monospace;color:var(--dim)}
+.pad kbd{position:absolute;right:6px;bottom:3px;font:10px ui-monospace,monospace;color:var(--dim)}
 .pad.hit kbd{color:#0b0a12}
 .types .pad{font-size:15px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .row label{color:var(--dim);font-size:13px}
+.lbl{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em}
 select,input[type=number]{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
 input[type=number]{width:72px}
-.steps{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;min-height:84px}
-.step{flex:0 0 auto;min-width:86px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
-.step.now{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
-.step .n{font-weight:700;font-size:17px}
-.step .ctl{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--dim)}
-.step .ctl button{padding:2px 7px;font-size:13px;border-radius:6px}
-.empty{color:var(--dim);font-size:13px;padding:10px 0}
-details.card>summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
-details.card>summary::after{content:"▾";color:var(--dim)}
-details.card[open]>summary::after{content:"▴"}
-.knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 14px;margin-top:12px}
-.knob{display:flex;flex-direction:column;gap:2px}
+#stepEdit b{font-size:20px;margin-right:6px}
+.knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px 14px}
+.knob{display:flex;flex-direction:column}
 .knob .t{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
 .knob .t b{color:var(--text);font-weight:500}
-input[type=range]{width:100%;accent-color:var(--accent);height:28px}
-.group{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em;grid-column:1/-1;margin-top:6px}
-.hint{color:var(--dim);font-size:12px;margin-top:8px}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
+.group{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em;grid-column:1/-1;margin-top:8px}
+.hint{color:var(--dim);font-size:12px;margin:0}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:9}
 #toast.show{opacity:1}
+@media (max-height:560px){ .viz{height:110px} .chordname{font-size:26px} }
 </style>
 </head>
 <body>
+<div id="app">
 <header>
   <h1>Chord<span>wave</span></h1>
-  <div class="sp"></div>
+  <button id="recBtn" class="rec ib" title="Aufnahme: jeder gespielte Akkord wird an den Loop angehängt">●</button>
+  <button id="playBtn" class="ib" title="Loop abspielen">▶</button>
+  <button id="stopBtn" class="ib" title="Alles stoppen (Leertaste)">■</button>
   <button id="latchBtn" class="on" title="Akkord klingt weiter, bis du einen neuen spielst">Halten</button>
-  <button id="stopBtn" title="Leertaste">Stopp</button>
 </header>
 
-<div class="card display">
+<div class="viz">
+  <canvas id="scope"></canvas>
   <div class="chordname" id="chordName">–<small>Tippe einen Grundton</small></div>
   <canvas id="kb"></canvas>
 </div>
 
-<div class="pads">
-  <div class="card">
-    <p class="label">Grundton</p>
+<div class="steps" id="steps"></div>
+
+<nav class="tabs">
+  <button data-tab="play" class="on">Akkorde</button>
+  <button data-tab="loop">Loop</button>
+  <button data-tab="sound">Sound</button>
+</nav>
+
+<main>
+  <section class="tab on" id="tab-play">
     <div class="roots" id="roots"></div>
-  </div>
-  <div class="card">
-    <p class="label">Akkordtyp</p>
     <div class="types" id="types"></div>
-  </div>
-</div>
+  </section>
 
-<div class="card">
-  <div class="row">
-    <p class="label" style="margin:0;flex:1">Loop</p>
-    <button id="recBtn" class="rec" title="Jeder gespielte Akkord wird an den Loop angehängt">● Aufnahme</button>
-    <button id="pauseStepBtn" title="Pause an den Loop anhängen">+ Pause</button>
-    <button id="playBtn">▶ Abspielen</button>
-  </div>
-  <div class="steps" id="steps"></div>
-  <div class="row">
-    <label>Tempo <input type="number" id="bpm" min="40" max="240" value="90"> BPM</label>
-    <label>Neue Akkorde <select id="stepBeats">
-      <option value="1">1 Schlag</option><option value="2">2 Schläge</option>
-      <option value="4" selected>1 Takt</option><option value="8">2 Takte</option></select></label>
-    <span class="sp" style="flex:1"></span>
-    <button id="clearBtn">Leeren</button>
-  </div>
-  <div class="row" style="margin-top:10px">
-    <label>Export-Durchläufe <select id="passes"><option>1</option><option selected>2</option><option>4</option></select></label>
-    <button id="wavBtn">⬇ WAV</button>
-    <button id="midiBtn">⬇ MIDI</button>
-  </div>
-</div>
+  <section class="tab" id="tab-loop">
+    <div class="box" id="stepEdit"></div>
+    <div class="box">
+      <div class="row">
+        <label>Tempo <input type="number" id="bpm" min="40" max="240" value="90"> BPM</label>
+        <label>Neue Akkorde <select id="stepBeats">
+          <option value="1">1 Schlag</option><option value="2">2 Schläge</option>
+          <option value="4" selected>1 Takt</option><option value="8">2 Takte</option></select></label>
+      </div>
+      <div class="row">
+        <button id="pauseStepBtn">+ Pause anhängen</button>
+        <button id="clearBtn">Loop leeren</button>
+      </div>
+    </div>
+    <div class="box">
+      <span class="lbl">Export</span>
+      <div class="row">
+        <label>Durchläufe <select id="passes"><option>1</option><option selected>2</option><option>4</option></select></label>
+        <button id="wavBtn">⬇ WAV</button>
+        <button id="midiBtn">⬇ MIDI</button>
+      </div>
+    </div>
+    <p class="hint">● drücken und im Tab „Akkorde“ spielen – jeder Akkord wird angehängt. Tippe oben auf einen Akkord im Loop, um ihn zu bearbeiten.</p>
+  </section>
 
-<details class="card" id="soundCard" open>
-  <summary>Sound</summary>
-  <div class="row" style="margin-top:12px">
-    <label>Preset <select id="preset"></select></label>
-    <label>Welle <select id="wave">
-      <option value="sawtooth">Säge</option><option value="square">Rechteck</option>
-      <option value="triangle">Dreieck</option><option value="sine">Sinus</option></select></label>
-    <label><input type="checkbox" id="bass"> Bass</label>
-    <label><input type="checkbox" id="retrig"> Neu anschlagen</label>
-  </div>
-  <div class="knobs" id="knobs"></div>
-  <p class="hint">PC: Grundton mit <b>A W S E D F T G Z/Y H U J</b> (wie Klaviertasten), Akkordtyp mit <b>1–0 ß ´</b> bzw. <b>1–0 - =</b>, Stopp mit Leertaste.</p>
-</details>
+  <section class="tab" id="tab-sound">
+    <div class="box">
+      <div class="row">
+        <label>Preset <select id="preset"></select></label>
+        <label>Welle <select id="wave">
+          <option value="sawtooth">Säge</option><option value="square">Rechteck</option>
+          <option value="triangle">Dreieck</option><option value="sine">Sinus</option></select></label>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="bass"> Bass</label>
+        <label><input type="checkbox" id="retrig"> Neu anschlagen</label>
+      </div>
+      <div class="knobs" id="knobs"></div>
+      <p class="hint">PC: Grundton mit <b>A W S E D F T G Z/Y H U J</b> (wie Klaviertasten), Akkordtyp mit <b>1–0 ß ´</b> bzw. <b>1–0 - =</b>, Stopp mit Leertaste.</p>
+    </div>
+  </section>
+</main>
+</div>
 
 <div id="toast"></div>
 
@@ -262,7 +284,8 @@ class Engine{
     this.gate = false;
     const out = ctx.createDynamicsCompressor();
     out.threshold.value = -10; out.ratio.value = 4;
-    out.connect(ctx.destination);
+    this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 4096; this.analyser.smoothingTimeConstant = 0;
+    out.connect(this.analyser); this.analyser.connect(ctx.destination);
     this.master = ctx.createGain(); this.master.connect(out);
     this.amp = ctx.createGain(); this.amp.gain.value = 0;
     this.filter = ctx.createBiquadFilter(); this.filter.type = 'lowpass';
@@ -453,38 +476,55 @@ function stopAll(){
 /* ---------- Loop ---------- */
 let recording = false, looping = false, loopIdx = 0, nextTime = 0, loopTimer = 0;
 function addStep(s){ steps.push(s); renderSteps(); save(); }
+let selStep = -1;
+function stepLabel(st){ return st.root == null ? 'Pause' : chordName(st.root, st.type); }
 function renderSteps(){
   const box = els.steps; box.innerHTML = '';
+  if (selStep >= steps.length) selStep = steps.length - 1;
   if (!steps.length){
     const e = document.createElement('div'); e.className = 'empty';
-    e.textContent = 'Noch leer. Drück „Aufnahme“ und spiel ein paar Akkorde – jeder wird angehängt.';
-    box.append(e); return;
+    e.textContent = 'Loop leer – ● drücken und Akkorde spielen';
+    box.append(e);
   }
-  steps.forEach((s, i) => {
-    const d = document.createElement('div'); d.className = 'step'; d.dataset.i = i;
-    const n = document.createElement('div'); n.className = 'n';
-    n.textContent = s.root == null ? 'Pause' : chordName(s.root, s.type);
-    const c = document.createElement('div'); c.className = 'ctl';
-    const minus = document.createElement('button'); minus.textContent = '−';
-    const len = document.createElement('span'); len.textContent = s.beats + ' ♩';
-    const plus = document.createElement('button'); plus.textContent = '+';
-    const del = document.createElement('button'); del.textContent = '×';
-    minus.onclick = () => { s.beats = Math.max(1, s.beats - 1); renderSteps(); save(); };
-    plus.onclick = () => { s.beats = Math.min(16, s.beats + 1); renderSteps(); save(); };
-    del.onclick = () => { steps.splice(i, 1); renderSteps(); save(); };
-    c.append(minus, len, plus, del);
-    d.append(n, c); box.append(d);
+  steps.forEach((st, i) => {
+    const d = document.createElement('button'); d.className = 'step' + (i === selStep ? ' sel' : ''); d.dataset.i = i;
+    d.append(stepLabel(st));
+    const len = document.createElement('i'); len.textContent = st.beats; d.append(len);
+    d.onclick = () => { selStep = i; renderSteps(); showTab('loop'); };
+    box.append(d);
   });
+  renderStepEdit();
+}
+function renderStepEdit(){
+  const ed = els.stepEdit; ed.innerHTML = '';
+  if (selStep < 0 || !steps[selStep]){
+    const p = document.createElement('p'); p.className = 'hint';
+    p.textContent = steps.length ? 'Tippe oben auf einen Akkord im Loop, um seine Länge zu ändern oder ihn zu löschen.' : 'Der Loop ist noch leer.';
+    ed.append(p); return;
+  }
+  const st = steps[selStep];
+  const row = document.createElement('div'); row.className = 'row';
+  const name = document.createElement('b'); name.textContent = stepLabel(st);
+  const len = document.createElement('span'); len.textContent = st.beats + (st.beats === 1 ? ' Schlag' : ' Schläge');
+  const mk = (t, f) => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { f(); renderSteps(); save(); }; return b; };
+  row.append(name,
+    mk('−', () => { st.beats = Math.max(1, st.beats - 1); }), len,
+    mk('+', () => { st.beats = Math.min(16, st.beats + 1); }),
+    mk('◀', () => { if (selStep > 0){ steps.splice(selStep - 1, 0, steps.splice(selStep, 1)[0]); selStep--; } }),
+    mk('▶', () => { if (selStep < steps.length - 1){ steps.splice(selStep + 1, 0, steps.splice(selStep, 1)[0]); selStep++; } }),
+    mk('Löschen', () => { steps.splice(selStep, 1); selStep = Math.min(selStep, steps.length - 1); }));
+  ed.append(row);
 }
 function markStep(i){
-  document.querySelectorAll('.step').forEach(el => el.classList.toggle('now', +el.dataset.i === i));
-  const el = document.querySelector('.step.now'); if (el) el.scrollIntoView({block:'nearest', inline:'nearest'});
+  els.steps.querySelectorAll('.step').forEach(el => el.classList.toggle('now', +el.dataset.i === i));
+  const el = els.steps.querySelector('.step.now');
+  if (el) els.steps.scrollTo({left: el.offsetLeft - els.steps.clientWidth / 2 + el.offsetWidth / 2, behavior:'smooth'});
 }
 function startLoop(){
   if (!steps.length){ toast('Der Loop ist noch leer – erst Akkorde aufnehmen.'); return; }
   ensureAudio();
   looping = true; loopIdx = 0; nextTime = ctx.currentTime + 0.08;
-  els.playBtn.classList.add('on'); els.playBtn.textContent = '■ Loop stoppen';
+  els.playBtn.classList.add('on'); els.playBtn.textContent = '❚❚';
   tick(); loopTimer = setInterval(tick, 25);
 }
 function tick(){
@@ -500,7 +540,7 @@ function tick(){
 }
 function stopLoop(){
   looping = false; clearInterval(loopTimer);
-  els.playBtn.classList.remove('on'); els.playBtn.textContent = '▶ Abspielen';
+  els.playBtn.classList.remove('on'); els.playBtn.textContent = '▶';
   markStep(-1); release();
 }
 
@@ -586,50 +626,93 @@ function exportMidi(){
   toast('MIDI gespeichert.');
 }
 
-/* ---------- Tastatur-Anzeige ---------- */
+/* ---------- Anzeige: Oszilloskop + Tastatur-Streifen ---------- */
 const KB_LO = 36, KB_HI = 85;
-function draw(){
-  const cv = els.kb, dpr = window.devicePixelRatio || 1;
-  const w = cv.clientWidth, h = cv.clientHeight;
-  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+let scopeBuf = null, scopeGain = 1;
+function fitCanvas(cv){
+  const dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const css = getComputedStyle(document.documentElement);
+  return {g, w, h};
+}
+function drawScope(acc, acc2){
+  const {g, w, h} = fitCanvas(els.scope);
+  // Nachleuchten: altes Bild nur abdunkeln statt löschen
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = 'rgba(7,6,12,0.55)'; g.fillRect(0, 0, w, h);
+  const mid = (h - 26) * 0.56;
+  g.strokeStyle = 'rgba(154,148,181,0.12)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, mid); g.lineTo(w, mid); g.stroke();
+  if (!engine) return;
+  const an = engine.analyser, N = an.fftSize;
+  if (!scopeBuf || scopeBuf.length !== N) scopeBuf = new Float32Array(N);
+  an.getFloatTimeDomainData(scopeBuf);
+  // stabiles Bild: bei steigendem Nulldurchgang starten
+  let start = 0;
+  for (let i = 1; i < N / 2; i++) if (scopeBuf[i - 1] < 0 && scopeBuf[i] >= 0){ start = i; break; }
+  const M = Math.floor(ctx.sampleRate * 0.018); // ca. 18 ms sichtbar
+  let peak = 0; for (let i = start; i < start + M; i++) peak = Math.max(peak, Math.abs(scopeBuf[i]));
+  const target = 0.8 / Math.max(peak, 0.04);
+  scopeGain += (target - scopeGain) * 0.08;
+  const amp = (h - 26) * 0.36 * scopeGain;
+  // geglättete Kurve (gleitender Mittelwert), damit die Welle ruhig wirkt
+  const K = 6, pts = [];
+  for (let x = 0; x <= w; x += 2){
+    const c = start + Math.floor(x / w * (M - 1));
+    let sum = 0; for (let k = -K; k <= K; k++) sum += scopeBuf[Math.max(0, Math.min(N - 1, c + k))];
+    pts.push([x, mid - sum / (2 * K + 1) * amp]);
+  }
+  const grad = g.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, acc); grad.addColorStop(1, acc2);
+  // Fläche unter der Welle
+  const fill = g.createLinearGradient(0, mid - amp, 0, mid + amp);
+  fill.addColorStop(0, 'rgba(124,240,208,0.10)'); fill.addColorStop(1, 'rgba(177,140,255,0.0)');
+  g.beginPath(); g.moveTo(0, mid); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(w, mid); g.closePath();
+  g.fillStyle = fill; g.fill();
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  for (const [lw, blur, alpha] of [[5, 16, 0.35], [2, 6, 1]]){
+    g.lineWidth = lw; g.shadowBlur = blur; g.shadowColor = acc; g.strokeStyle = grad; g.globalAlpha = alpha;
+    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
+  }
+  g.shadowBlur = 0; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+}
+function drawKeys(acc, acc2){
+  const {g, w, h} = fitCanvas(els.kb);
   const isBlack = m => [1,3,6,8,10].includes(m % 12);
   const whites = []; for (let m = KB_LO; m < KB_HI; m++) if (!isBlack(m)) whites.push(m);
   const ww = w / whites.length;
-  const xOf = m => { // kontinuierliche Position einer (auch gebrochenen) Tonhöhe
-    const lo = Math.floor(m), fr = m - lo;
-    const c = n => { const wi = whites.filter(x => x < n).length; return isBlack(n) ? wi * ww : wi * ww + ww / 2; };
-    return c(lo) + (c(lo + 1) - c(lo)) * fr;
-  };
-  g.fillStyle = '#e9e6f3'; g.fillRect(0, 0, w, h);
-  g.strokeStyle = '#8f8aa6'; g.lineWidth = 1;
+  const cx = n => { const wi = whites.filter(x => x < n).length; return isBlack(n) ? wi * ww : wi * ww + ww / 2; };
+  const xOf = m => { const lo = Math.floor(m); return cx(lo) + (cx(lo + 1) - cx(lo)) * (m - lo); };
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = 'rgba(233,230,243,0.10)'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(233,230,243,0.12)'; g.lineWidth = 1;
   whites.forEach((m, i) => { g.beginPath(); g.moveTo(i * ww + .5, 0); g.lineTo(i * ww + .5, h); g.stroke(); });
-  for (let m = KB_LO; m < KB_HI; m++) if (isBlack(m)){
-    const x = xOf(m); g.fillStyle = '#1a1726'; g.fillRect(x - ww * 0.32, 0, ww * 0.64, h * 0.6);
-  }
-  if (engine){
-    const t = ctx.currentTime, lvl = engine.amp.gain.value;
-    const acc = css.getPropertyValue('--accent').trim(), acc2 = css.getPropertyValue('--accent2').trim();
-    g.globalAlpha = Math.min(1, lvl * 1.4 + 0.08);
-    engine.voices.forEach((v, i) => {
-      const isBass = i === MAX_VOICES;
-      if (!isBass && i >= P.voices) return;
-      if (isBass && !P.bass) return;
-      const m = ftom(engine.freqAt(v, t));
-      if (m < KB_LO || m > KB_HI - 1) return;
-      const x = xOf(m);
-      g.fillStyle = isBass ? acc2 : acc;
-      g.beginPath(); g.arc(x, h * 0.8, Math.min(9, ww * 0.45), 0, Math.PI * 2); g.fill();
-    });
-    g.globalAlpha = 1;
-  }
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  for (let m = KB_LO; m < KB_HI; m++) if (isBlack(m)) g.fillRect(cx(m) - ww * 0.3, 0, ww * 0.6, h * 0.55);
+  if (!engine) return;
+  const t = ctx.currentTime;
+  g.globalAlpha = Math.min(1, engine.amp.gain.value * 1.4 + 0.1);
+  engine.voices.forEach((v, i) => {
+    const isBass = i === MAX_VOICES;
+    if ((!isBass && i >= P.voices) || (isBass && !P.bass)) return;
+    const m = ftom(engine.freqAt(v, t));
+    if (m < KB_LO || m > KB_HI - 1) return;
+    g.fillStyle = isBass ? acc2 : acc; g.shadowColor = g.fillStyle; g.shadowBlur = 10;
+    g.beginPath(); g.arc(xOf(m), h * 0.66, Math.min(6, ww * 0.4), 0, Math.PI * 2); g.fill();
+  });
+  g.shadowBlur = 0; g.globalAlpha = 1;
+}
+const CSS = getComputedStyle(document.documentElement);
+const ACC = CSS.getPropertyValue('--accent').trim(), ACC2 = CSS.getPropertyValue('--accent2').trim();
+function draw(){
+  drawScope(ACC, ACC2);
+  drawKeys(ACC, ACC2);
   requestAnimationFrame(draw);
 }
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','kb','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','kb','scope','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -746,6 +829,11 @@ els.playBtn.addEventListener('click', () => looping ? stopLoop() : startLoop());
 els.clearBtn.addEventListener('click', () => { if (!steps.length || confirm('Loop wirklich leeren?')) { if (looping) stopLoop(); steps = []; renderSteps(); save(); } });
 els.wavBtn.addEventListener('click', () => exportWav().catch(e => toast('WAV-Export fehlgeschlagen: ' + e.message)));
 els.midiBtn.addEventListener('click', exportMidi);
+function showTab(name){
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + name));
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 window.addEventListener('pagehide', saveNow);
 
 syncUI(); renderSteps();
