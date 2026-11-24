@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Chordwave</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
 <meta name="theme-color" content="#0b0a12">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -29,6 +30,7 @@ button.on{background:var(--accent);color:#0b0a12;border-color:var(--accent);font
 button.rec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
 header .ib{width:42px;height:38px;padding:0;font-size:16px}
 header #latchBtn{height:38px;padding:0 10px;font-size:14px}
+@media (max-width:400px){ header{gap:4px} header h1{font-size:16px} header .ib{width:36px} header #latchBtn{padding:0 7px;font-size:13px} }
 .viz{flex:0 0 auto;display:flex;flex-direction:column;background:#07060c;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .vtop{position:relative;height:clamp(120px,22dvh,240px)}
 #scope{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -114,6 +116,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 <div id="app">
 <header>
   <h1>Chord<span>wave</span></h1>
+  <button id="installBtn" class="ib" title="Als App installieren" hidden>⤓</button>
   <button id="recBtn" class="rec ib" title="Aufnahme: jeder gespielte Akkord wird an den Loop angehängt">●</button>
   <button id="playBtn" class="ib" title="Loop abspielen">▶</button>
   <button id="stopBtn" class="ib" title="Alles stoppen (Leertaste)">■</button>
@@ -1297,6 +1300,20 @@ els.undoBtn.addEventListener('click', () => {
 
 syncUI(); renderSteps(); updateHarmony();
 requestAnimationFrame(draw);
+
+// Installieren: eigener Button (Chrome, Brave, Edge, Samsung) bzw. Anleitung (iPhone)
+let installEvt = null;
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const installBtn = document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!standalone) installBtn.hidden = false; });
+window.addEventListener('appinstalled', () => { installBtn.hidden = true; installEvt = null; toast('Chordwave ist installiert.'); });
+if (isIOS && !standalone) installBtn.hidden = false;
+installBtn.addEventListener('click', async () => {
+  if (installEvt){ installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === 'accepted') installBtn.hidden = true; installEvt = null; }
+  else if (isIOS) toast('In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.');
+  else toast('Im Browser-Menü ⋮ „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.');
+});
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
