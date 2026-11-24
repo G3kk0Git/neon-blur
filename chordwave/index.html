@@ -33,7 +33,20 @@ header #latchBtn{height:38px;padding:0 10px;font-size:14px}
 #scope{position:absolute;inset:0;width:100%;height:100%}
 .chordname{position:absolute;left:14px;top:8px;z-index:1;font-size:34px;font-weight:700;letter-spacing:.02em;text-shadow:0 0 6px #07060c,0 0 14px #07060c,0 0 22px rgba(124,240,208,.4);pointer-events:none}
 .chordname small{display:block;font-size:12px;color:var(--dim);font-weight:400;text-shadow:0 0 4px #07060c,0 0 8px #07060c}
-#kb{position:absolute;left:0;right:0;bottom:0;width:100%;height:26px;opacity:.9}
+#keyLabel{position:absolute;right:12px;top:10px;z-index:1;font-size:12px;color:var(--dim);text-shadow:0 0 6px #07060c;pointer-events:none}
+.sugs{flex:0 0 auto;display:flex;gap:6px;align-items:center;overflow-x:auto;scrollbar-width:none;min-height:44px}
+.sugs::-webkit-scrollbar{display:none}
+.sugs select{flex:0 0 auto;padding:6px 4px;font-size:13px;max-width:118px}
+.sugs .t{flex:0 0 auto;font-size:11px;color:var(--dim);line-height:1.1}
+.sug{flex:0 0 auto;height:40px;padding:0 10px;border-color:rgba(124,240,208,.45);background:rgba(124,240,208,.08);font-weight:700;display:flex;align-items:center;gap:5px}
+.sug i{font-style:normal;font-weight:400;font-size:11px;color:var(--accent)}
+.sug.best{background:rgba(124,240,208,.2);border-color:var(--accent)}
+.pad .deg{position:absolute;left:6px;top:3px;font:600 10px system-ui;color:var(--dim)}
+.pad.inkey{background:#211d33}
+.pad.sugd{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6),0 0 10px rgba(124,240,208,.25)}
+.pad.sugd .deg{color:var(--accent)}
+.pad.fit{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6)}
+.pad.fit::after{content:"passt";position:absolute;left:6px;top:3px;font:600 9px system-ui;color:var(--accent)}
 .steps{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;height:40px;align-items:stretch;scrollbar-width:none}
 .steps::-webkit-scrollbar{display:none}
 .step{flex:0 0 auto;min-width:52px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:0 10px;display:flex;align-items:center;gap:6px;font-weight:700;font-size:15px}
@@ -91,7 +104,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 <div class="viz">
   <canvas id="scope"></canvas>
   <div class="chordname" id="chordName">–<small>Tippe einen Grundton</small></div>
-  <canvas id="kb"></canvas>
+  <div id="keyLabel"></div>
 </div>
 
 <div class="steps" id="steps"></div>
@@ -104,6 +117,11 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 
 <main>
   <section class="tab on" id="tab-play">
+    <div class="sugs">
+      <select id="keySel" title="Tonart"></select>
+      <span class="t">passt<br>jetzt:</span>
+      <span id="sugs" style="display:contents"></span>
+    </div>
     <div class="roots" id="roots"></div>
     <div class="types" id="types"></div>
   </section>
@@ -121,6 +139,21 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
         <button id="pauseStepBtn">+ Pause anhängen</button>
         <button id="clearBtn">Loop leeren</button>
       </div>
+    </div>
+    <div class="box">
+      <span class="lbl">Generator</span>
+      <div class="row">
+        <label>Dauer <select id="genDur">
+          <option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">1 min</option>
+          <option value="120">2 min</option><option value="180">3 min</option></select></label>
+        <label>Stil <select id="genStyle"></select></label>
+        <label>Tonart <select id="genKey"><option value="cur">aktuelle</option><option value="rnd">zufällig</option></select></label>
+      </div>
+      <div class="row">
+        <button id="genBtn" class="on">✨ Abfolge erzeugen</button>
+        <button id="undoBtn" disabled>Rückgängig</button>
+      </div>
+      <p class="hint">Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab.</p>
     </div>
     <div class="box">
       <span class="lbl">Export</span>
@@ -258,6 +291,111 @@ class VoiceLeader{
   }
 }
 
+/* ---------- Harmonie: Tonart, Stufen, passende Folgeakkorde ---------- */
+const TI = id => CHORDS.findIndex(c => c.id === id);
+const MODES = {
+  maj: {name:'Dur', steps:[0,2,4,5,7,9,11], q:['','m','m','','','m','dim'], num:['I','ii','iii','IV','V','vi','vii°'], extra:[]},
+  min: {name:'Moll', steps:[0,2,3,5,7,8,10], q:['m','dim','','m','','',''], num:['i','ii°','III','iv','V','VI','VII'], extra:[11]},
+};
+// Übergangs-Gewichte: von Stufe -> {Stufe: Gewicht} (klassische Funktionsharmonik)
+const TRANS = {
+  maj: {0:{3:3,4:3,5:3,1:2,2:1}, 1:{4:4,6:1,3:1}, 2:{5:3,3:2,1:1}, 3:{4:3,0:3,1:2,6:.5}, 4:{0:5,5:2,3:1}, 5:{1:2,3:3,4:2,2:1}, 6:{0:4,2:1}},
+  min: {0:{3:3,5:3,6:3,4:2,2:1}, 1:{4:4,6:1}, 2:{5:3,3:2,6:2}, 3:{4:3,0:3,6:2,1:1}, 4:{0:5,5:2}, 5:{3:2,6:3,2:2,1:1}, 6:{2:3,0:3,5:1}},
+};
+const KEYS = []; for (const m of ['maj','min']) for (let r = 0; r < 12; r++) KEYS.push({root:r, mode:m});
+const keyName = k => NOTE_NAMES[k.root] + '-' + MODES[k.mode].name;
+function scalePcs(k){ const M = MODES[k.mode]; return M.steps.concat(M.extra).map(x => (x + k.root) % 12); }
+function degreeOf(k, root){ return MODES[k.mode].steps.findIndex(x => (x + k.root) % 12 === root); }
+function diatonic(k, d){ return {root:(MODES[k.mode].steps[d] + k.root) % 12, type:TI(MODES[k.mode].q[d])}; }
+function chordPcs(root, type){ return CHORDS[type].iv.map(x => (x + root) % 12); }
+// Tonart aus den letzten gespielten Akkorden schätzen
+function guessKey(hist){
+  if (!hist.length) return {root:0, mode:'maj'};
+  let best = null, bs = -1;
+  for (const k of KEYS){
+    const sc = new Set(scalePcs(k));
+    let score = 0;
+    hist.forEach((h, i) => {
+      const pcs = chordPcs(h.root, h.type), w = 1 + i / hist.length;
+      score += w * pcs.filter(x => sc.has(x)).length / pcs.length;
+      if (pcs.every(x => sc.has(x))) score += w * 0.5;
+      const d = degreeOf(k, h.root);
+      if (d === 0 && CHORDS[h.type].iv[1] === (k.mode === 'maj' ? 4 : 3)) score += w * (i === 0 ? 0.9 : 0.4);
+    });
+    if (score > bs + 1e-9){ bs = score; best = k; }
+  }
+  return best;
+}
+function suggestions(k, root, type){
+  const out = [];
+  const d = root == null ? -1 : degreeOf(k, root);
+  let w = (d >= 0 && TRANS[k.mode][d]) ? TRANS[k.mode][d] : (k.mode === 'maj' ? {0:4,3:3,4:3,5:2} : {0:4,5:3,6:3,3:2});
+  Object.entries(w).sort((a, b) => b[1] - a[1]).forEach(([dd, wt]) => out.push({...diatonic(k, +dd), deg:+dd, w:wt}));
+  return out.slice(0, 5);
+}
+function pickW(obj){
+  const e = Object.entries(obj).filter(x => x[1] > 0); let sum = e.reduce((a, x) => a + x[1], 0), r = Math.random() * sum;
+  for (const [k, v] of e){ r -= v; if (r <= 0) return +k; } return +e[e.length - 1][0];
+}
+
+/* ---------- Generator ---------- */
+const STYLES = {
+  'Pop':          {mode:null,  beats:[4],   phrase:4, color:{}, boost:{}},
+  'Melancholisch':{mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{}},
+  'Jazz':         {mode:'maj', beats:[2,4], phrase:4, color:{'':[['maj7',3],['maj9',1]], m:[['m7',3],['m9',1]], dim:[['dim',1]]}, dom:'7', boost:{1:{4:4}, 4:{0:4}, 5:{1:2}}},
+  'Lo-Fi':        {mode:null,  beats:[4],   phrase:4, color:{'':[['maj7',2],['maj9',1],['add9',1]], m:[['m7',2],['m9',2]]}, dom:'7', boost:{1:{4:2}}},
+  'Ambient':      {mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{}},
+  'Episch':       {mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}}},
+};
+function colorize(st, mode, d){
+  const base = MODES[mode].q[d];
+  if (d === 4 && st.dom && Math.random() < 0.7) return TI(st.dom);
+  const opts = st.color[base];
+  if (!opts) return TI(base);
+  const tot = opts.reduce((a, o) => a + o[1], 0); let r = Math.random() * tot;
+  for (const [id, w] of opts){ r -= w; if (r <= 0) return TI(id); }
+  return TI(base);
+}
+function genPhrase(st, mode, startDeg, len){
+  const T = TRANS[mode], degs = [startDeg];
+  for (let i = 1; i < len; i++){
+    const prev = degs[i - 1];
+    const w = Object.assign({}, T[prev]);
+    if (st.flat) for (let d = 0; d < 7; d++) w[d] = (w[d] || 0) + 1;
+    if (st.boost[prev]) for (const [d, b] of Object.entries(st.boost[prev])) w[d] = (w[d] || 0) + b;
+    if (st.noDim) delete w[mode === 'maj' ? 6 : 1];
+    delete w[prev];
+    if (i === len - 1){ // letzter Akkord führt zurück zur Tonika
+      for (const d in w) w[d] *= (T[d] && T[d][0] ? T[d][0] : 0.2);
+      delete w[0];
+    }
+    degs.push(Object.keys(w).length ? pickW(w) : 4);
+  }
+  return degs;
+}
+function generate(seconds, styleName, key){
+  const st = STYLES[styleName];
+  let k = {...key};
+  if (st.mode && st.mode !== k.mode) k = st.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
+  const totalBeats = Math.max(4, Math.round(seconds * P.bpm / 60));
+  const beats = st.beats[Math.floor(Math.random() * st.beats.length)];
+  const A = genPhrase(st, k.mode, 0, st.phrase);
+  const B = genPhrase(st, k.mode, Math.random() < 0.5 ? 3 : 5, st.phrase);
+  const form = [A, A, B, A];
+  const colA = A.map(d => colorize(st, k.mode, d)), colB = B.map(d => colorize(st, k.mode, d));
+  const out = []; let sum = 0, f = 0;
+  while (sum < totalBeats){
+    const ph = form[f % form.length], cols = ph === A ? colA : colB;
+    for (let i = 0; i < ph.length && sum < totalBeats; i++){
+      const c = diatonic(k, ph[i]);
+      const b = Math.min(beats, totalBeats - sum);
+      out.push({root:c.root, type:cols[i], beats:b}); sum += b;
+    }
+    f++;
+  }
+  return {steps:out, key:k};
+}
+
 /* ---------- Klangerzeugung ---------- */
 const MAX_VOICES = 6;
 function makeImpulse(ctx, seconds){
@@ -388,7 +526,7 @@ const PRESETS = {
 };
 const KNOBS = [
   ['Stimmen'],
-  ['voices','Stimmen',3,6,1, v=>v],
+  ['voices','Stimmen',2,6,1, v=>v],
   ['octave','Lage',-2,2,1, v=>(v>0?'+':'')+v+' Okt'],
   ['glide','Gleitzeit',0,3,0.01, v=>v.toFixed(2)+' s'],
   ['detune','Verstimmung',0,40,1, v=>v+' ct'],
@@ -457,7 +595,42 @@ function release(){
   engine.gateOff(ctx.currentTime + 0.005);
   sounding = false;
 }
+let chordHist = [], keyFixed = null;
+function currentKey(){ return keyFixed || guessKey(chordHist); }
+function updateHarmony(){
+  const k = currentKey();
+  els.keyLabel.textContent = 'Tonart: ' + keyName(k) + (keyFixed ? '' : ' (auto)');
+  const sc = new Set(scalePcs(k));
+  const sug = suggestions(k, curRoot, curType);
+  const sugRoots = new Set(sug.map(x => x.root));
+  rootBtns.forEach((b, r) => {
+    const d = degreeOf(k, r);
+    b.classList.toggle('inkey', d >= 0);
+    b.classList.toggle('sugd', sugRoots.has(r) && r !== curRoot);
+    b.querySelector('.deg').textContent = d >= 0 ? MODES[k.mode].num[d] : '';
+  });
+  // Akkordtyp, der zum gewählten Grundton in der Tonart passt
+  const dr = curRoot == null ? -1 : degreeOf(k, curRoot);
+  typeBtns.forEach((b, t) => {
+    const fits = curRoot != null && chordPcs(curRoot, t).every(x => sc.has(x));
+    b.classList.toggle('fit', fits && t !== curType);
+  });
+  els.sugs.innerHTML = '';
+  sug.forEach((x, i) => {
+    const b = document.createElement('button'); b.className = 'sug' + (i === 0 ? ' best' : '');
+    b.append(chordName(x.root, x.type));
+    const n = document.createElement('i'); n.textContent = MODES[k.mode].num[x.deg]; b.append(n);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); playChord(x.root, x.type); });
+    b.addEventListener('pointerup', () => { if (!latch && !looping) release(); });
+    els.sugs.append(b);
+  });
+}
 function showChord(root, type, notes){
+  if (!chordHist.length || chordHist[chordHist.length - 1].root !== root || chordHist[chordHist.length - 1].type !== type){
+    chordHist.push({root, type}); if (chordHist.length > 8) chordHist.shift();
+  }
+  curRoot = root; curType = type;
+  updateHarmony();
   els.chordName.innerHTML = '';
   els.chordName.append(chordName(root, type));
   const s = document.createElement('small');
@@ -626,93 +799,86 @@ function exportMidi(){
   toast('MIDI gespeichert.');
 }
 
-/* ---------- Anzeige: Oszilloskop + Tastatur-Streifen ---------- */
-const KB_LO = 36, KB_HI = 85;
-let scopeBuf = null, scopeGain = 1;
+/* ---------- Anzeige: jede Stimme als Linie über die Zeit ---------- */
+const WIN = 6;                 // sichtbare Sekunden
+const VOICE_COLORS = ['#7cf0d0','#7cc8ff','#ffd27c','#ff9ad5','#9cff8f','#f4f1ff'];
+const BASS_COLOR = '#b18cff';
+const hist = [];
+let viewLo = 52, viewHi = 76;
 function fitCanvas(cv){
   const dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.clientWidth, h = cv.clientHeight;
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   return {g, w, h};
 }
-function drawScope(acc, acc2){
-  const {g, w, h} = fitCanvas(els.scope);
-  // Nachleuchten: altes Bild nur abdunkeln statt löschen
-  g.globalCompositeOperation = 'source-over';
-  g.fillStyle = 'rgba(7,6,12,0.55)'; g.fillRect(0, 0, w, h);
-  const mid = (h - 26) * 0.56;
-  g.strokeStyle = 'rgba(154,148,181,0.12)'; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(0, mid); g.lineTo(w, mid); g.stroke();
-  if (!engine) return;
-  const an = engine.analyser, N = an.fftSize;
-  if (!scopeBuf || scopeBuf.length !== N) scopeBuf = new Float32Array(N);
-  an.getFloatTimeDomainData(scopeBuf);
-  // stabiles Bild: bei steigendem Nulldurchgang starten
-  let start = 0;
-  for (let i = 1; i < N / 2; i++) if (scopeBuf[i - 1] < 0 && scopeBuf[i] >= 0){ start = i; break; }
-  const M = Math.floor(ctx.sampleRate * 0.018); // ca. 18 ms sichtbar
-  let peak = 0; for (let i = start; i < start + M; i++) peak = Math.max(peak, Math.abs(scopeBuf[i]));
-  const target = 0.8 / Math.max(peak, 0.04);
-  scopeGain += (target - scopeGain) * 0.08;
-  const amp = (h - 26) * 0.36 * scopeGain;
-  // geglättete Kurve (gleitender Mittelwert), damit die Welle ruhig wirkt
-  const K = 6, pts = [];
-  for (let x = 0; x <= w; x += 2){
-    const c = start + Math.floor(x / w * (M - 1));
-    let sum = 0; for (let k = -K; k <= K; k++) sum += scopeBuf[Math.max(0, Math.min(N - 1, c + k))];
-    pts.push([x, mid - sum / (2 * K + 1) * amp]);
-  }
-  const grad = g.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0, acc); grad.addColorStop(1, acc2);
-  // Fläche unter der Welle
-  const fill = g.createLinearGradient(0, mid - amp, 0, mid + amp);
-  fill.addColorStop(0, 'rgba(124,240,208,0.10)'); fill.addColorStop(1, 'rgba(177,140,255,0.0)');
-  g.beginPath(); g.moveTo(0, mid); pts.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(w, mid); g.closePath();
-  g.fillStyle = fill; g.fill();
-  g.lineJoin = 'round'; g.lineCap = 'round';
-  for (const [lw, blur, alpha] of [[5, 16, 0.35], [2, 6, 1]]){
-    g.lineWidth = lw; g.shadowBlur = blur; g.shadowColor = acc; g.strokeStyle = grad; g.globalAlpha = alpha;
-    g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
-  }
-  g.shadowBlur = 0; g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-}
-function drawKeys(acc, acc2){
-  const {g, w, h} = fitCanvas(els.kb);
-  const isBlack = m => [1,3,6,8,10].includes(m % 12);
-  const whites = []; for (let m = KB_LO; m < KB_HI; m++) if (!isBlack(m)) whites.push(m);
-  const ww = w / whites.length;
-  const cx = n => { const wi = whites.filter(x => x < n).length; return isBlack(n) ? wi * ww : wi * ww + ww / 2; };
-  const xOf = m => { const lo = Math.floor(m); return cx(lo) + (cx(lo + 1) - cx(lo)) * (m - lo); };
-  g.clearRect(0, 0, w, h);
-  g.fillStyle = 'rgba(233,230,243,0.10)'; g.fillRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(233,230,243,0.12)'; g.lineWidth = 1;
-  whites.forEach((m, i) => { g.beginPath(); g.moveTo(i * ww + .5, 0); g.lineTo(i * ww + .5, h); g.stroke(); });
-  g.fillStyle = 'rgba(0,0,0,0.55)';
-  for (let m = KB_LO; m < KB_HI; m++) if (isBlack(m)) g.fillRect(cx(m) - ww * 0.3, 0, ww * 0.6, h * 0.55);
-  if (!engine) return;
-  const t = ctx.currentTime;
-  g.globalAlpha = Math.min(1, engine.amp.gain.value * 1.4 + 0.1);
-  engine.voices.forEach((v, i) => {
-    const isBass = i === MAX_VOICES;
-    if ((!isBass && i >= P.voices) || (isBass && !P.bass)) return;
-    const m = ftom(engine.freqAt(v, t));
-    if (m < KB_LO || m > KB_HI - 1) return;
-    g.fillStyle = isBass ? acc2 : acc; g.shadowColor = g.fillStyle; g.shadowBlur = 10;
-    g.beginPath(); g.arc(xOf(m), h * 0.66, Math.min(6, ww * 0.4), 0, Math.PI * 2); g.fill();
-  });
-  g.shadowBlur = 0; g.globalAlpha = 1;
-}
-const CSS = getComputedStyle(document.documentElement);
-const ACC = CSS.getPropertyValue('--accent').trim(), ACC2 = CSS.getPropertyValue('--accent2').trim();
 function draw(){
-  drawScope(ACC, ACC2);
-  drawKeys(ACC, ACC2);
+  const {g, w, h} = fitCanvas(els.scope);
+  g.clearRect(0, 0, w, h);
+  const now = ctx ? ctx.currentTime : 0;
+  if (engine){
+    const lvl = engine.amp.gain.value;
+    hist.push({t:now, a:lvl, m:engine.voices.map(v => ftom(engine.freqAt(v, now)))});
+    while (hist.length && hist[0].t < now - WIN - 0.5) hist.shift();
+  }
+  // sichtbaren Tonbereich weich nachführen
+  let lo = Infinity, hi = -Infinity;
+  for (const f of hist) if (f.a > 0.01) for (let i = 0; i <= MAX_VOICES; i++){
+    if (i === MAX_VOICES ? !P.bass : i >= P.voices) continue;
+    lo = Math.min(lo, f.m[i]); hi = Math.max(hi, f.m[i]);
+  }
+  if (lo < Infinity){
+    let tl = lo - 3, th = hi + 3;
+    if (th - tl < 18){ const c = (tl + th) / 2; tl = c - 9; th = c + 9; }
+    viewLo += (tl - viewLo) * 0.06; viewHi += (th - viewHi) * 0.06;
+  }
+  const top = 50, bot = h - 10;
+  const y = m => bot - (m - viewLo) / (viewHi - viewLo) * (bot - top);
+  const xNow = w * 0.84;
+  const x = t => xNow - (now - t) / WIN * xNow;
+  // Raster: Töne der Tonart hell hinterlegt, C-Linien beschriftet
+  const sc = new Set(scalePcs(currentKey()));
+  const rowH = (bot - top) / (viewHi - viewLo);
+  g.font = '10px system-ui'; g.textBaseline = 'middle';
+  for (let m = Math.ceil(viewLo); m <= Math.floor(viewHi); m++){
+    const yy = y(m);
+    if (sc.has(((m % 12) + 12) % 12)){ g.fillStyle = 'rgba(124,240,208,0.045)'; g.fillRect(0, yy - rowH / 2, w, rowH); }
+    if (m % 12 === 0){
+      g.fillStyle = 'rgba(236,233,247,0.14)'; g.fillRect(0, Math.round(yy) + .5, w, 1);
+      g.fillStyle = 'rgba(236,233,247,0.35)'; g.fillText('C' + (m / 12 - 1), 4, yy - 7);
+    }
+  }
+  g.fillStyle = 'rgba(236,233,247,0.08)'; g.fillRect(xNow, top - 10, 1, bot - top + 10);
+  // Linien
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  const order = [MAX_VOICES]; for (let i = 0; i < P.voices; i++) order.push(i);
+  for (const i of order){
+    if (i === MAX_VOICES && !P.bass) continue;
+    const col = i === MAX_VOICES ? BASS_COLOR : VOICE_COLORS[i];
+    g.strokeStyle = col; g.shadowColor = col; g.shadowBlur = 10; g.lineWidth = i === MAX_VOICES ? 2 : 3;
+    let open = false, lastA = 0;
+    g.beginPath();
+    for (const f of hist){
+      if (f.a < 0.01){ open = false; continue; }
+      const px = x(f.t), py = y(f.m[i]);
+      open ? g.lineTo(px, py) : g.moveTo(px, py); open = true; lastA = f.a;
+    }
+    g.globalAlpha = i === MAX_VOICES ? 0.6 : 1; g.stroke();
+    const f = hist[hist.length - 1];
+    if (f && f.a > 0.01){
+      const py = y(f.m[i]);
+      g.globalAlpha = Math.min(1, f.a * 1.3 + 0.2);
+      g.beginPath(); g.arc(xNow, py, i === MAX_VOICES ? 3.5 : 5, 0, Math.PI * 2); g.fillStyle = col; g.fill();
+      g.shadowBlur = 0; g.fillStyle = col; g.font = '600 11px system-ui';
+      const nm = Math.round(f.m[i]); g.fillText(NOTE_NAMES[((nm % 12) + 12) % 12] + (Math.floor(nm / 12) - 1), xNow + 9, py);
+    }
+    g.globalAlpha = 1; g.shadowBlur = 0;
+  }
   requestAnimationFrame(draw);
 }
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','kb','scope','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -726,6 +892,7 @@ const rootBtns = [], typeBtns = [];
 NOTE_NAMES.forEach((n, i) => {
   const b = document.createElement('button'); b.className = 'pad' + (n.includes('#') ? ' sharp' : '');
   b.textContent = n; const k = document.createElement('kbd'); k.textContent = US_LABELS[ROOT_CODES[i]]; b.append(k);
+  const dg = document.createElement('span'); dg.className = 'deg'; b.append(dg);
   padPress(b, () => rootDown(i, 'p'), () => rootUp(i, 'p'));
   els.roots.append(b); rootBtns.push(b);
 });
@@ -744,7 +911,7 @@ function rootUp(i, src){
 function typeDown(i){
   curType = i;
   if (curRoot != null && (sounding || held.size)) playChord(curRoot, i, true);
-  else typeBtns.forEach((b, j) => b.classList.toggle('sel', j === i));
+  else { typeBtns.forEach((b, j) => b.classList.toggle('sel', j === i)); updateHarmony(); }
 }
 // Beschriftung an echtes Tastaturlayout anpassen (z. B. Z statt Y auf deutscher Tastatur)
 if (navigator.keyboard && navigator.keyboard.getLayoutMap){
@@ -836,7 +1003,32 @@ function showTab(name){
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 window.addEventListener('pagehide', saveNow);
 
-syncUI(); renderSteps();
+// Tonart-Auswahl
+{ const o = document.createElement('option'); o.value = 'auto'; o.textContent = 'Tonart: auto'; els.keySel.append(o); }
+KEYS.forEach((k, i) => { const o = document.createElement('option'); o.value = i; o.textContent = keyName(k); els.keySel.append(o); });
+els.keySel.addEventListener('change', () => { keyFixed = els.keySel.value === 'auto' ? null : KEYS[+els.keySel.value]; updateHarmony(); });
+// Generator
+Object.keys(STYLES).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.genStyle.append(o); });
+let undoSteps = null;
+els.genBtn.addEventListener('click', () => {
+  const key = els.genKey.value === 'rnd' ? KEYS[Math.floor(Math.random() * 12) + (Math.random() < 0.5 ? 0 : 12)] : currentKey();
+  const g = generate(+els.genDur.value, els.genStyle.value, key);
+  undoSteps = steps.map(x => ({...x})); els.undoBtn.disabled = false;
+  if (looping) stopLoop();
+  steps = g.steps; selStep = -1; renderSteps(); save();
+  chordHist = []; leader.prev = null;
+  if (els.keySel.value !== 'auto'){ keyFixed = g.key; els.keySel.value = KEYS.findIndex(k => k.root === g.key.root && k.mode === g.key.mode); }
+  const secs = Math.round(steps.reduce((a, x) => a + x.beats, 0) * 60 / P.bpm);
+  toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
+  startLoop();
+});
+els.undoBtn.addEventListener('click', () => {
+  if (!undoSteps) return;
+  if (looping) stopLoop();
+  steps = undoSteps; undoSteps = null; els.undoBtn.disabled = true; selStep = -1; renderSteps(); save();
+});
+
+syncUI(); renderSteps(); updateHarmony();
 requestAnimationFrame(draw);
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
