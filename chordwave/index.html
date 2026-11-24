@@ -152,6 +152,20 @@ body.focus #focus{display:block}
 .fctl .bpm span{min-width:62px;text-align:center;font-weight:600}
 .fctl .sp{flex:1}
 .fadv{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:4px}
+/* Speichern-Menü */
+#sheet{display:none;position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.55);align-items:flex-end;justify-content:center}
+#sheet.on{display:flex}
+#sheet .sp2{background:var(--panel);border:1px solid var(--line);border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:88dvh;overflow-y:auto;
+  padding:14px 16px max(16px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+#sheet h3{margin:0;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+#sheet .grp{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+#sheet .grp .lbl{margin-bottom:2px}
+#sheet .row button{flex:1 1 auto}
+#recLive.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
+#recBadge{display:none;position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9;background:var(--warn);color:#0b0a12;
+  font-weight:700;font-size:13px;padding:5px 12px;border-radius:20px;cursor:pointer}
+#recBadge.on{display:block}
+.ib.save{font-size:17px}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:9}
 #toast.show{opacity:1}
 @media (max-height:700px){ .vtop{height:96px} .chordname .r{font-size:30px} .chordname .q{font-size:17px} #piano{height:48px} .pad{min-height:34px} }
@@ -162,6 +176,7 @@ body.focus #focus{display:block}
 <header>
   <h1>Chord<span>wave</span></h1>
   <button id="installBtn" class="ib" title="Als App installieren" hidden>⤓</button>
+  <button id="saveBtn" class="ib save" title="Speichern, Export, Audio-Aufnahme">💾</button>
   <button id="recBtn" class="rec ib" title="Aufnahme: jeder gespielte Akkord wird an den Loop angehängt">●</button>
   <button id="playBtn" class="ib" title="Loop abspielen">▶</button>
   <button id="stopBtn" class="ib" title="Alles stoppen (Leertaste)">■</button>
@@ -286,6 +301,7 @@ body.focus #focus{display:block}
  <div class="fin">
   <div class="fhead">
     <h2>Fokus<span id="fKey"></span></h2>
+    <button id="fSave" title="Speichern, Export, Audio-Aufnahme">💾</button>
     <button id="fPlay" title="Loop abspielen">▶</button>
     <button id="fExit" title="Fokus-Modus verlassen">✕</button>
   </div>
@@ -310,6 +326,32 @@ body.focus #focus{display:block}
   </div>
  </div>
 </div>
+
+<div id="sheet">
+ <div class="sp2">
+  <h3>Speichern &amp; Export <button id="sheetClose">✕</button></h3>
+  <div class="grp">
+    <span class="lbl">Loop exportieren</span>
+    <div class="row">
+      <label>Durchläufe <select id="passes2"><option>1</option><option selected>2</option><option>4</option></select></label>
+    </div>
+    <div class="row"><button id="wavBtn2">⬇ WAV (Audio)</button><button id="midiBtn2">⬇ MIDI (Noten)</button></div>
+    <p class="hint">Berechnet den Loop sauber mit dem aktuellen Sound – inklusive der einzeln wechselnden Stimmen.</p>
+  </div>
+  <div class="grp">
+    <span class="lbl">Live aufnehmen</span>
+    <div class="row"><button id="recLive">⏺ Audio-Aufnahme starten</button></div>
+    <p class="hint">Nimmt alles auf, was du ab jetzt hörst (live gespielt oder Loop), und speichert es beim Stoppen als WAV.</p>
+  </div>
+  <div class="grp">
+    <span class="lbl">Loops speichern</span>
+    <div class="row"><button id="loopSave">💾 Aktuellen Loop speichern …</button></div>
+    <div class="row"><select id="loopList" style="flex:1"></select><button id="loopLoad">Laden</button><button id="loopDel">Löschen</button></div>
+    <p class="hint">Gespeichert werden Akkorde, Tempo und Sound – lokal in diesem Browser.</p>
+  </div>
+ </div>
+</div>
+<div id="recBadge" title="Aufnahme stoppen">⏺ REC 0:00</div>
 
 <div id="toast"></div>
 
@@ -474,14 +516,14 @@ function degreeOf(k, root){ return MODES[k.mode].steps.findIndex(x => (x + k.roo
 function diatonic(k, d){ return {root:(MODES[k.mode].steps[d] + k.root) % 12, type:TI(MODES[k.mode].q[d])}; }
 function chordPcs(root, type){ return CHORDS[type].iv.map(x => (x + root) % 12); }
 // Tonart aus den letzten gespielten Akkorden schätzen
-function guessKey(hist){
+function guessKey(hist, uniform){
   if (!hist.length) return {root:0, mode:'maj'};
   let best = null, bs = -1;
   for (const k of KEYS){
     const nat = new Set(scalePcs(k).slice(0, 7));
     let score = 0;
     hist.forEach((h, i) => {
-      const pcs = chordPcs(h.root, h.type), w = 1 + i / hist.length;
+      const pcs = chordPcs(h.root, h.type), w = uniform ? 1 : 1 + i / hist.length;
       // Leitton der Moll-Tonart nur bei Dominant-Akkorden (V, vii°) mitzählen
       const iv = (h.root - k.root + 12) % 12;
       const sc = (k.mode === 'min' && (iv === 7 || iv === 11)) ? new Set([...nat, (k.root + 11) % 12]) : nat;
@@ -957,7 +999,7 @@ let chordHist = [], keyFixed = null;
 function currentKey(){
   if (keyFixed) return keyFixed;
   const loopChords = steps.filter(x => x.root != null).map(x => ({root:x.root, type:x.type}));
-  return guessKey(loopChords.length ? loopChords.slice(0, 16) : chordHist);
+  return loopChords.length ? guessKey(loopChords.slice(0, 16), true) : guessKey(chordHist);
 }
 function updateHarmony(){
   const k = currentKey();
@@ -1824,7 +1866,11 @@ function renderFocus(){
 function renderFocusSugs(){
   const g = focusGrid(); let ref = null;
   for (let d = 1; d <= g.length; d++){ const c = g[(focusCursor - d + g.length * 2) % g.length]; if (c){ ref = c; break; } }
-  const k = currentKey(), list = suggestions(k, ref ? ref.root : null, ref ? ref.type : 0);
+  // Tonart nur aus den übrigen Takten – sonst würde der gerade gesetzte Akkord die Vorschläge verändern
+  const len = +els.fLen.value, others = [];
+  g.forEach((c, i) => { if (c && !(i >= focusCursor && i < focusCursor + len)){ const l = others[others.length - 1]; if (!l || l.root !== c.root || l.type !== c.type) others.push(c); } });
+  const k = keyFixed || guessKey(others.length ? others : (ref ? [ref] : []), true);
+  const list = suggestions(k, ref ? ref.root : null, ref ? ref.type : 0);
   els.fSugs.innerHTML = '';
   const here = g[focusCursor];
   list.forEach((x, i) => {
@@ -1958,6 +2004,96 @@ els.fGen.addEventListener('click', () => { runGenerator(0, barCount() * 4); focu
 els.fSound.addEventListener('click', () => { setFocus(false); showTab('sound'); });
 try { els.fAdvance.checked = localStorage.getItem('chordwave.advance') === '1'; } catch(e){}
 els.fAdvance.addEventListener('change', () => { try { localStorage.setItem('chordwave.advance', els.fAdvance.checked ? '1' : '0'); } catch(e){} });
+
+/* ---------- Speichern-Menü: Export, Live-Aufnahme, Loops ---------- */
+['sheet','sheetClose','passes2','wavBtn2','midiBtn2','recLive','loopSave','loopList','loopLoad','loopDel','recBadge','saveBtn','fSave'].forEach(id => els[id] = document.getElementById(id));
+function openSheet(){ els.passes2.value = els.passes.value; fillLoopList(); els.sheet.classList.add('on'); }
+function closeSheet(){ els.sheet.classList.remove('on'); }
+els.saveBtn.addEventListener('click', openSheet);
+els.fSave.addEventListener('click', openSheet);
+els.sheetClose.addEventListener('click', closeSheet);
+els.sheet.addEventListener('click', e => { if (e.target === els.sheet) closeSheet(); });
+els.passes2.addEventListener('change', () => { els.passes.value = els.passes2.value; });
+els.wavBtn2.addEventListener('click', () => { els.passes.value = els.passes2.value; exportWav().catch(e => toast('WAV-Export fehlgeschlagen: ' + e.message)); });
+els.midiBtn2.addEventListener('click', () => { els.passes.value = els.passes2.value; exportMidi(); });
+
+// Live-Aufnahme: alles, was aus der App kommt, mitschneiden und als WAV speichern
+let liveRec = null;
+function recLabel(){
+  const on = !!liveRec;
+  els.recLive.classList.toggle('on', on);
+  els.recLive.textContent = on ? '⏹ Aufnahme stoppen & als WAV speichern' : '⏺ Audio-Aufnahme starten';
+  els.recBadge.classList.toggle('on', on);
+}
+function startLiveRec(){
+  if (!window.MediaRecorder){ toast('Dieser Browser kann keine Audio-Aufnahme.'); return; }
+  ensureAudio();
+  const dest = ctx.createMediaStreamDestination();
+  engine.analyser.connect(dest);
+  const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+  const mime = types.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+  const mr = new MediaRecorder(dest.stream, mime ? {mimeType: mime, audioBitsPerSecond: 256000} : undefined);
+  const chunks = [];
+  mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onstop = async () => {
+    try { engine && engine.analyser.disconnect(dest); } catch(e){}
+    try {
+      const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
+      const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+      download(encodeWav(buf), 'chordwave-aufnahme.wav');
+      toast('Aufnahme gespeichert (' + Math.round(buf.duration) + ' s).');
+    } catch(e){ toast('Aufnahme konnte nicht gespeichert werden: ' + e.message); }
+  };
+  mr.start(500);
+  liveRec = {mr, t0: performance.now(), timer: setInterval(() => {
+    const sec = Math.floor((performance.now() - liveRec.t0) / 1000);
+    els.recBadge.textContent = `⏺ REC ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – tippen zum Stoppen`;
+  }, 250)};
+  recLabel(); toast('Aufnahme läuft – spiel los.');
+}
+function stopLiveRec(){
+  if (!liveRec) return;
+  clearInterval(liveRec.timer); liveRec.mr.stop(); liveRec = null; recLabel();
+}
+els.recLive.addEventListener('click', () => { if (liveRec) stopLiveRec(); else { startLiveRec(); closeSheet(); } });
+els.recBadge.addEventListener('click', stopLiveRec);
+
+// Loops speichern / laden
+const LSTORE = 'chordwave.loops';
+let savedLoops = {};
+try { savedLoops = JSON.parse(localStorage.getItem(LSTORE) || '{}') || {}; } catch(e){}
+function storeLoops(){ try { localStorage.setItem(LSTORE, JSON.stringify(savedLoops)); } catch(e){ toast('Speichern nicht möglich (privater Modus?)'); } }
+function fillLoopList(){
+  els.loopList.innerHTML = '';
+  const names = Object.keys(savedLoops).sort((a, b) => (savedLoops[b].t || 0) - (savedLoops[a].t || 0));
+  if (!names.length){ const o = document.createElement('option'); o.textContent = '– noch keine gespeichert –'; o.value = ''; els.loopList.append(o); }
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n + ' (' + savedLoops[n].steps.filter(x => x.root != null).length + ' Akkorde, ' + savedLoops[n].bpm + ' BPM)'; els.loopList.append(o); });
+  els.loopLoad.disabled = els.loopDel.disabled = !names.length;
+}
+els.loopSave.addEventListener('click', () => {
+  if (loopIsEmpty()){ toast('Der Loop ist leer.'); return; }
+  const first = steps.filter(x => x.root != null).slice(0, 4).map(x => chordName(x.root, x.type)).join(' ');
+  const name = (prompt('Name für diesen Loop:', first) || '').trim().slice(0, 50);
+  if (!name) return;
+  if (savedLoops[name] && !confirm(`„${name}“ gibt es schon. Überschreiben?`)) return;
+  savedLoops[name] = {steps: steps.map(x => ({...x})), bpm: P.bpm, seed: loopSeed, sound: soundOf(P), t: Date.now()};
+  storeLoops(); fillLoopList(); els.loopList.value = name;
+  toast(`Loop „${name}“ gespeichert.`);
+});
+els.loopLoad.addEventListener('click', () => {
+  const L = savedLoops[els.loopList.value]; if (!L) return;
+  if (looping) stopLoop();
+  pushUndo();
+  steps = L.steps.map(x => ({...x})); loopSeed = L.seed ?? loopSeed; P.bpm = L.bpm || P.bpm;
+  if (L.sound){ Object.assign(P, L.sound); lastOctave = P.octave; fillPresets(''); }
+  selStep = -1; leader.prev = null; focusCursor = 0; lastWrite = null;
+  syncUI(); changed(); loopChanged(); closeSheet();
+  toast(`Loop „${els.loopList.value}“ geladen.`);
+});
+els.loopDel.addEventListener('click', () => {
+  const n = els.loopList.value; if (!n || !confirm(`Loop „${n}“ löschen?`)) return;
+  delete savedLoops[n]; storeLoops(); fillLoopList();
+});
 
 syncUI(); renderSteps(); updateHarmony(); updUndo();
 requestAnimationFrame(draw);
