@@ -41,7 +41,7 @@ header #latchBtn{height:38px;padding:0 10px;font-size:14px}
 .chordname .q{font-size:22px;margin-left:2px;color:var(--accent)}
 .chordname small{display:block;font-size:11px;color:var(--dim);font-weight:400;margin-top:4px;letter-spacing:.04em}
 #keyLabel{font-size:11px;color:var(--dim);margin-top:3px}
-#piano{display:block;width:100%;height:46px;border-top:1px solid var(--line);touch-action:none;cursor:pointer}
+#piano{display:block;width:100%;height:62px;border-top:1px solid var(--line);touch-action:none;cursor:pointer}
 @media (min-width:760px){
   .vtop{height:clamp(150px,26dvh,280px)}
   .nowp{left:0;top:0;bottom:0;width:200px;padding:12px 14px;border-right:1px solid var(--line);text-shadow:none}
@@ -109,7 +109,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 .hint{color:var(--dim);font-size:12px;margin:0}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:9}
 #toast.show{opacity:1}
-@media (max-height:700px){ .vtop{height:96px} .chordname .r{font-size:30px} .chordname .q{font-size:17px} #piano{height:36px} .pad{min-height:34px} }
+@media (max-height:700px){ .vtop{height:96px} .chordname .r{font-size:30px} .chordname .q{font-size:17px} #piano{height:48px} .pad{min-height:34px} }
 </style>
 </head>
 <body>
@@ -993,39 +993,83 @@ function drawLines(){
 }
 
 
-const PIANO_LO = 36, PIANO_HI = 84;   // C2 … C6
-let pianoGeo = null;
-function pianoLayout(w){
-  const isBlack = m => [1,3,6,8,10].includes(((m % 12) + 12) % 12);
-  const whites = []; for (let m = PIANO_LO; m <= PIANO_HI; m++) if (!isBlack(m)) whites.push(m);
-  const ww = w / whites.length, keys = {};
-  whites.forEach((m, i) => keys[m] = {x:i * ww, w:ww, black:false});
-  for (let m = PIANO_LO; m <= PIANO_HI; m++) if (isBlack(m)){ const l = keys[m - 1]; keys[m] = {x:l.x + ww * 0.68, w:ww * 0.64, black:true}; }
-  return {keys, ww, isBlack};
-}
+// Klavier: Tasten mindestens ~26 px breit; sichtbarer Ausschnitt folgt weich den gespielten Tönen
+const PIANO_MIN = 24, PIANO_MAX = 96;   // C1 … C7 (gesamter Bereich, sichtbar ist ein Ausschnitt)
+const isBlackKey = m => [1,3,6,8,10].includes(((m % 12) + 12) % 12);
+let pianoGeo = null, pianoView = null, pianoPress = null;
+function whitesBelow(m){ let n = 0; for (let k = PIANO_MIN; k < m; k++) if (!isBlackKey(k)) n++; return n; }
 function drawPiano(){
   const {g, w, h} = fitCanvas(els.piano);
-  pianoGeo = pianoLayout(w);
-  const {keys, ww} = pianoGeo;
-  // aktive Tasten: Stimme -> Farbe
-  const act = {};
+  const octs = Math.max(2, Math.min(4, Math.floor(w / (7 * 26))));
+  const ww = w / (octs * 7 + 1);
+  // aktive Töne
+  const act = {}, played = [];
   if (engine){
     const t = ctx.currentTime, on = engine.gate || engine.amp.gain.value > 0.02;
     if (on) engine.voices.forEach((v, i) => {
       const isBass = i === MAX_VOICES;
       if ((!isBass && i >= P.voices) || (isBass && !P.bass)) return;
       const m = Math.round(ftom(engine.freqAt(v, t)));
+      if (!isBass) played.push(m);
       if (!act[m] || isBass) act[m] = isBass ? BASS_COLOR : VOICE_COLORS[i];
     });
   }
+  // Ziel-Ausschnitt: tiefste C-Oktave so wählen, dass die Akkordtöne (ohne Bass) sichtbar sind
+  if (pianoView == null) pianoView = {lo: 48 - (octs > 2 ? 12 : 0), x: null};
+  if (played.length && !pianoPress){
+    const lo = Math.min(...played), hi = Math.max(...played), span = octs * 12;
+    let target = pianoView.lo;
+    if (lo < target || hi > target + span) target = 12 * Math.floor(((lo + hi) / 2 - span / 2 + 6) / 12);
+    if (hi - lo < span){ if (lo < target) target = 12 * Math.floor(lo / 12); if (hi > target + span) target = 12 * Math.ceil((hi - span) / 12); }
+    pianoView.lo = Math.max(PIANO_MIN, Math.min(PIANO_MAX - span, target));
+  }
+  const tx = whitesBelow(pianoView.lo) * ww;
+  pianoView.x = pianoView.x == null ? tx : pianoView.x + (tx - pianoView.x) * 0.15;
+  const off = pianoView.x;
+  const keys = {};
+  for (let m = PIANO_MIN; m <= PIANO_MAX; m++){
+    if (!isBlackKey(m)) keys[m] = {x: whitesBelow(m) * ww - off, w: ww, black:false};
+  }
+  for (let m = PIANO_MIN; m <= PIANO_MAX; m++) if (isBlackKey(m)){ const l = keys[m - 1]; keys[m] = {x: l.x + ww * 0.66, w: ww * 0.68, black:true}; }
+  pianoGeo = {keys, ww, h};
   g.clearRect(0, 0, w, h);
-  for (let m = PIANO_LO; m <= PIANO_HI; m++){ const k = keys[m]; if (k.black) continue;
-    g.fillStyle = act[m] || '#d9d5e8'; g.fillRect(k.x + 0.5, 0, k.w - 1, h - 1);
-    if (m % 12 === 0 && !act[m]){ g.fillStyle = '#7d7896'; g.font = '9px system-ui'; g.textBaseline = 'bottom'; g.fillText('C' + (m / 12 - 1), k.x + 2, h - 2); }
+  const vis = k => k.x + k.w > 0 && k.x < w;
+  const rootPc = sounding || held.size ? curRoot : null;
+  g.textAlign = 'center'; g.textBaseline = 'bottom';
+  for (let m = PIANO_MIN; m <= PIANO_MAX; m++){ const k = keys[m]; if (k.black || !vis(k)) continue;
+    const pressed = pianoPress && pianoPress.m === m;
+    g.fillStyle = act[m] || (pressed ? '#a9a4c0' : '#dedaeb');
+    g.beginPath(); g.roundRect ? g.roundRect(k.x + 1, 0, k.w - 2, h - 1, [0, 0, 5, 5]) : g.rect(k.x + 1, 0, k.w - 2, h - 1); g.fill();
+    if (rootPc != null && m % 12 === rootPc){ g.fillStyle = '#b18cff'; g.fillRect(k.x + 4, h - 5, k.w - 8, 3); }
+    if (ww >= 18){
+      g.fillStyle = act[m] ? '#0b0a12' : '#6f6a88';
+      g.font = (m % 12 === 0 ? '600 ' : '') + Math.min(11, ww * 0.42) + 'px system-ui';
+      g.fillText(NOTE_NAMES[m % 12] + (m % 12 === 0 ? (m / 12 - 1) : ''), k.x + k.w / 2, h - 7);
+    }
   }
-  for (let m = PIANO_LO; m <= PIANO_HI; m++){ const k = keys[m]; if (!k.black) continue;
-    g.fillStyle = act[m] || '#16131f'; g.fillRect(k.x, 0, k.w, h * 0.6);
+  for (let m = PIANO_MIN; m <= PIANO_MAX; m++){ const k = keys[m]; if (!k.black || !vis(k)) continue;
+    const pressed = pianoPress && pianoPress.m === m;
+    g.fillStyle = act[m] || (pressed ? '#3a3550' : '#16131f');
+    g.beginPath(); g.roundRect ? g.roundRect(k.x, 0, k.w, h * 0.58, [0, 0, 4, 4]) : g.rect(k.x, 0, k.w, h * 0.58); g.fill();
+    if (rootPc != null && m % 12 === rootPc){ g.fillStyle = '#b18cff'; g.fillRect(k.x + 3, h * 0.58 - 5, k.w - 6, 3); }
   }
+  // Pfeile, wenn Töne außerhalb des sichtbaren Bereichs liegen
+  const visLo = pianoView.lo, visHi = pianoView.lo + octs * 12;
+  for (const [mStr, col] of Object.entries(act)){
+    const m = +mStr;
+    if (m >= visLo && m <= visHi) continue;
+    const left = m < visLo, ax = left ? 6 : w - 6, ay = h * 0.3;
+    g.fillStyle = col; g.beginPath();
+    g.moveTo(ax + (left ? -2 : 2), ay); g.lineTo(ax + (left ? 8 : -8), ay - 7); g.lineTo(ax + (left ? 8 : -8), ay + 7); g.fill();
+  }
+  g.textAlign = 'start';
+}
+function pianoHit(e){
+  if (!pianoGeo) return null;
+  const r = els.piano.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  for (const [m, k] of Object.entries(pianoGeo.keys)) if (k.black && py < r.height * 0.58 && px >= k.x && px < k.x + k.w) return +m;
+  for (const [m, k] of Object.entries(pianoGeo.keys)) if (!k.black && px >= k.x && px < k.x + k.w) return +m;
+  return null;
 }
 
 /* ---------- UI aufbauen ---------- */
@@ -1232,18 +1276,30 @@ els.octDown.addEventListener('click', () => setOctave(P.octave - 1));
 els.octUp.addEventListener('click', () => setOctave(P.octave + 1));
 els.quickGlide.addEventListener('input', () => { P.glide = +els.quickGlide.value / 1000; knobEls.glide.set(P.glide); els.preset.value = ''; changed('glide'); });
 els.latency.addEventListener('change', () => { P.latency = els.latency.value; save(); resetAudio(); toast('Audio neu eingestellt – tippe einen Akkord.'); });
-// Klavier antippen = Grundton
+// Klavier: antippen = Grundton, mit dem Finger wischen = Akkord gleitet mit
 els.piano.addEventListener('pointerdown', e => {
   e.preventDefault();
-  if (!pianoGeo) return;
-  const r = els.piano.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-  let hit = null;
-  for (const [m, k] of Object.entries(pianoGeo.keys)) if (k.black && py < r.height * 0.6 && px >= k.x && px < k.x + k.w) hit = +m;
-  if (hit == null) for (const [m, k] of Object.entries(pianoGeo.keys)) if (!k.black && px >= k.x && px < k.x + k.w) hit = +m;
-  if (hit == null) return;
-  const pc = hit % 12; held.add('p' + pc); els.piano._pc = pc; playChord(pc, curType);
+  const m = pianoHit(e); if (m == null) return;
+  els.piano.setPointerCapture?.(e.pointerId);
+  pianoPress = {m, pc: m % 12, moved: false, id: e.pointerId};
+  held.add('p' + pianoPress.pc); playChord(pianoPress.pc, curType);
 });
-const pianoUp = () => { if (els.piano._pc != null){ rootUp(els.piano._pc, 'p'); els.piano._pc = null; } };
+els.piano.addEventListener('pointermove', e => {
+  if (!pianoPress || e.pointerId !== pianoPress.id) return;
+  const m = pianoHit(e); if (m == null || m === pianoPress.m) return;
+  pianoPress.m = m;
+  const pc = m % 12;
+  if (pc === pianoPress.pc) return;
+  held.delete('p' + pianoPress.pc); held.add('p' + pc);
+  pianoPress.pc = pc; pianoPress.moved = true;
+  playChord(pc, curType, true);            // beim Wischen nicht jeden Zwischenakkord aufnehmen
+});
+const pianoUp = e => {
+  if (!pianoPress || (e && e.pointerId !== pianoPress.id)) return;
+  const {pc, moved} = pianoPress; pianoPress = null;
+  if (moved && recording) addStep({root: pc, type: curType, beats: +els.stepBeats.value});
+  rootUp(pc, 'p');
+};
 els.piano.addEventListener('pointerup', pianoUp); els.piano.addEventListener('pointercancel', pianoUp);
 els.bass.addEventListener('change', () => { P.bass = els.bass.checked; changed(); });
 els.retrig.addEventListener('change', () => { P.retrig = els.retrig.checked; changed(); });
