@@ -62,6 +62,8 @@ header #latchBtn{height:38px;padding:0 10px;font-size:14px}
 .sug{flex:0 0 auto;height:40px;padding:0 10px;border-color:rgba(124,240,208,.45);background:rgba(124,240,208,.08);font-weight:700;display:flex;align-items:center;gap:5px}
 .sug i{font-style:normal;font-weight:400;font-size:11px;color:var(--accent)}
 .sug.best{background:rgba(124,240,208,.2);border-color:var(--accent)}
+.sug.color{border-color:rgba(177,140,255,.6);background:rgba(177,140,255,.10)}
+.sug.color i{color:var(--accent2)}
 .pad .deg{position:absolute;left:6px;top:3px;font:600 10px system-ui;color:var(--dim)}
 .pad.inkey{background:#211d33}
 .pad.sugd{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6),0 0 10px rgba(124,240,208,.25)}
@@ -149,6 +151,7 @@ body.focus #focus{display:block}
 .fctl .bpm button{width:36px;height:38px;padding:0}
 .fctl .bpm span{min-width:62px;text-align:center;font-weight:600}
 .fctl .sp{flex:1}
+.fadv{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:4px}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:9}
 #toast.show{opacity:1}
 @media (max-height:700px){ .vtop{height:96px} .chordname .r{font-size:30px} .chordname .q{font-size:17px} #piano{height:48px} .pad{min-height:34px} }
@@ -289,11 +292,13 @@ body.focus #focus{display:block}
   <div class="fbars" id="fBars"></div>
   <canvas id="fGraph"></canvas>
   <div class="finfo"><div class="chordname" id="fChord"><span class="r">–</span></div><div class="fstatus" id="fStatus"></div></div>
+  <div class="sugs" id="fSugRow"><span class="t">passt<br>hier:</span><span id="fSugs" style="display:contents"></span></div>
   <div class="froots" id="fRoots"></div>
   <div class="ftypes" id="fTypes"></div>
   <div class="fctl">
     <select id="fBarsSel" title="Anzahl Takte"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="3">3 Takte</option><option value="4">4 Takte</option><option value="5">5 Takte</option><option value="6">6 Takte</option><option value="7">7 Takte</option><option value="8">8 Takte</option></select>
     <select id="fLen" title="Länge eines neuen Akkords"><option value="4">1 Takt</option><option value="2">½ Takt</option></select>
+    <label class="fadv"><input type="checkbox" id="fAdvance"> danach weiter</label>
     <span class="bpm"><button id="fBpmDown">−</button><span id="fBpm"></span><button id="fBpmUp">+</button></span>
   </div>
   <div class="fctl">
@@ -348,7 +353,21 @@ const chordSuffix = t => CHORDS[t].disp ?? CHORDS[t].id;
 const SHARP_DISP = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const FLAT_DISP  = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 let spellFlat = false;            // B-Tonarten: B♭ statt A♯
-const noteDisp = pc => (spellFlat ? FLAT_DISP : SHARP_DISP)[((pc % 12) + 12) % 12];
+let spellScale = null, spellRoot = 0;   // leiterfremde Töne: ♭II ♭III ♭V ♭VI ♭VII mit ♭, sonst mit ♯
+const noteDisp = pc => { pc = ((pc % 12) + 12) % 12;
+  if (spellScale && !spellScale.has(pc)) return [1,3,6,8,10].includes((pc - spellRoot + 12) % 12) ? FLAT_DISP[pc] : SHARP_DISP[pc];
+  return (spellFlat ? FLAT_DISP : SHARP_DISP)[pc]; };
+// Akkordtöne nach Intervall buchstabieren (E7: G♯, nicht A♭)
+const LET = ['C','D','E','F','G','A','B'], LET_PC = [0,2,4,5,7,9,11];
+function ivLetter(iv, type){ const m = {0:0,1:1,2:1,3:2,4:2,5:3,6:4,7:4,8:5,9:5,10:6,11:6,13:1,14:1,15:1,17:3,18:3,21:5};
+  if (iv === 8 && QUAL(type) === 'aug') return 4; if (iv === 9 && CHORDS[type].id === 'dim7') return 6; return m[iv] ?? 0; }
+function toneName(root, type, note){
+  const pc = ((note % 12) + 12) % 12, rn = noteDisp(root), li = LET.indexOf(rn[0]);
+  const iv = CHORDS[type].iv.find(x => (root + x) % 12 === pc);
+  if (iv == null || li < 0) return noteDisp(pc);
+  const L = (li + ivLetter(iv, type)) % 7; let d = ((pc - LET_PC[L]) % 12 + 12) % 12; if (d > 6) d -= 12;
+  return LET[L] + (d === 0 ? '' : d === 1 ? '♯' : d === -1 ? '♭' : d === 2 ? '𝄪' : d === -2 ? '𝄫' : '');
+}
 const chordName = (root, t) => noteDisp(root) + chordSuffix(t);
 const BASIC_TYPES = 12;
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -459,10 +478,13 @@ function guessKey(hist){
   if (!hist.length) return {root:0, mode:'maj'};
   let best = null, bs = -1;
   for (const k of KEYS){
-    const sc = new Set(scalePcs(k));
+    const nat = new Set(scalePcs(k).slice(0, 7));
     let score = 0;
     hist.forEach((h, i) => {
       const pcs = chordPcs(h.root, h.type), w = 1 + i / hist.length;
+      // Leitton der Moll-Tonart nur bei Dominant-Akkorden (V, vii°) mitzählen
+      const iv = (h.root - k.root + 12) % 12;
+      const sc = (k.mode === 'min' && (iv === 7 || iv === 11)) ? new Set([...nat, (k.root + 11) % 12]) : nat;
       score += w * pcs.filter(x => sc.has(x)).length / pcs.length;
       if (pcs.every(x => sc.has(x))) score += w * 0.5;
       const d = degreeOf(k, h.root);
@@ -472,12 +494,129 @@ function guessKey(hist){
   }
   return best;
 }
+/* ---------- Harmonie-Netzwerk ----------
+   Jeder Akkord ist ein Knoten. Mögliche Nachfolger kommen aus: leitereigenen Akkorden,
+   Modal Interchange (Parallel-Dur/-Moll), Zwischendominanten, Tritonus-Substitution,
+   Neo-Riemann (P/L/R) und chromatischen Medianten. Jede Verbindung wird bewertet nach
+   gemeinsamen Tönen, Stimmführungs-Distanz, Funktion, Spannung, Stimmung und Überraschung. */
+const QUAL = t => { const iv = CHORDS[t].iv, h = x => iv.includes(x);
+  if (h(4) && h(10)) return 'dom'; if (h(4) && h(8)) return 'aug'; if (h(3) && h(6) && !h(7)) return 'dim';
+  if (h(3)) return 'min'; if (h(4)) return 'maj'; return 'sus'; };
+const DEG_NAMES = ['I','♭II','II','♭III','III','IV','♯IV','V','♭VI','VI','♭VII','VII'];
+const DEG_NAMES_MIN = ['I','♭II','II','III','♯III','IV','♯IV','V','VI','♯VI','VII','♯VII'];
+function roman(k, root, type){
+  let r = (k.mode === 'min' ? DEG_NAMES_MIN : DEG_NAMES)[(root - k.root + 12) % 12]; const q = QUAL(type);
+  if (q === 'min' || q === 'dim') r = r.toLowerCase();
+  if (q === 'dim') r += CHORDS[type].id === 'm7b5' ? 'ø' : '°';
+  if (q === 'aug') r += '+';
+  if (q === 'dom') r += '7';
+  return r;
+}
+const CAT_INFO = {dia:'leitereigen', secdom:'Zwischendominante', borrow:'geliehen (Modal Interchange)', nr:'Neo-Riemann', tritone:'Tritonus-Substitution', mediant:'chromatische Mediante'};
+const CAT_PRIO = {dia:0, secdom:1, borrow:2, nr:3, tritone:4, mediant:5};
+const CAT_SURPRISE = {dia:0, borrow:0.45, secdom:0.5, nr:0.55, tritone:0.75, mediant:0.9};
+const SEVENTH = {'':'maj7', m:'m7', dim:'m7b5'};
+function inKey(k, root, type){ const sc = new Set(scalePcs(k)); return chordPcs(root, type).every(x => sc.has(x)); }
+function netCandidates(k, from){
+  const map = new Map();
+  const add = (root, type, cat, extra = {}) => {
+    root = ((root % 12) + 12) % 12; if (type < 0) return;
+    const key = root + '|' + type, old = map.get(key);
+    if (!old || CAT_PRIO[cat] < CAT_PRIO[old.cat]) map.set(key, {root, type, cat, ...extra});
+  };
+  for (let d = 0; d < 7; d++){
+    const c = diatonic(k, d); add(c.root, c.type, 'dia', {deg:d});
+    const q = MODES[k.mode].q[d];
+    const sev = TI(d === 4 ? '7' : SEVENTH[q]);
+    if (inKey(k, c.root, sev) || (d === 4 && k.mode === 'min')) add(c.root, sev, 'dia', {deg:d});
+  }
+  // Modal Interchange: Akkorde aus der parallelen Tonart (gleicher Grundton)
+  const par = {root:k.root, mode: k.mode === 'maj' ? 'min' : 'maj'};
+  for (let d = 0; d < 7; d++){ const c = diatonic(par, d); if (!inKey(k, c.root, c.type)) add(c.root, c.type, 'borrow'); }
+  if (k.mode === 'min') add(k.root + 5, TI(''), 'borrow');       // dorische IV
+  else { add(k.root + 10, TI(''), 'borrow'); add(k.root + 8, TI('maj7'), 'borrow'); }   // ♭VII, ♭VImaj7
+  // Zwischendominanten V7/x und Tritonus-Substitution subV7/x
+  const targets = k.mode === 'maj' ? [0,1,2,3,4,5] : [0,2,3,5,6];
+  for (const d of targets){
+    const t = diatonic(k, d);
+    if (d !== 0) add(t.root + 7, TI('7'), 'secdom', {target:t});
+    add(t.root + 1, TI('7'), 'tritone', {target:t});
+  }
+  if (from){
+    const q = QUAL(from.type), r = from.root;
+    if (q === 'maj' || q === 'min'){
+      const maj = q === 'maj';
+      add(r, TI(maj ? 'm' : ''), 'nr', {op:'P'});
+      add(r + (maj ? 4 : 8), TI(maj ? 'm' : ''), 'nr', {op:'L'});
+      add(r + (maj ? 9 : 3), TI(maj ? 'm' : ''), 'nr', {op:'R'});
+      for (const off of [3, 4, 8, 9]) if (!inKey(k, r + off, TI(maj ? '' : 'm'))) add(r + off, TI(maj ? '' : 'm'), 'mediant');
+    }
+  }
+  return [...map.values()];
+}
+function vlDistance(aPcs, bPcs){
+  let s = 0; for (const b of bPcs){ let m = 12; for (const a of aPcs){ const d = Math.abs(a - b) % 12; m = Math.min(m, d, 12 - d); } s += m; }
+  return s / bPcs.length;
+}
+function chordTension(k, c){
+  const q = QUAL(c.type), id = CHORDS[c.type].id;
+  let t = {maj:0.15, min:0.3, sus:0.4, dom:0.65, dim:0.8, aug:0.85}[q];
+  if (/b9|#9|#11|13/.test(id)) t += 0.15;
+  if (/maj7|9|6/.test(id) && q !== 'dom') t += 0.07;
+  if (c.root === k.root && q !== 'dom') t -= 0.12;
+  t += {dia:0, borrow:0.1, secdom:0.1, nr:0.1, tritone:0.15, mediant:0.2}[c.cat] || 0;
+  return Math.max(0, Math.min(1, t));
+}
+// Wie stark „löst“ Akkord c in Ziel t auf?
+function resolves(c, t){
+  const q = QUAL(c.type), iv = (c.root - t.root + 12) % 12;
+  if (q === 'dom' && iv === 7) return 1;            // Dominante
+  if (q === 'dom' && iv === 1) return 0.9;          // Tritonus-Substitution
+  if (q === 'dim' && iv === 11) return 0.85;        // Leitton-Akkord
+  if (iv === 5) return 0.6;                         // plagal (IV–I / iv–I)
+  if (iv === 10) return 0.5;                        // ♭VII–I
+  if (iv === 7) return 0.7;
+  return 0.15 * chordPcs(c.root, c.type).filter(x => chordPcs(t.root, t.type).includes(x)).length;
+}
+const MOOD_NEUTRAL = {wCommon:0.6, wVL:0.7, wFunc:1.1, wSur:-0.2, wT:0.4, cat:{}, q:{}};
+function scoreLink(k, from, c, mood, targetT){
+  const fP = from ? chordPcs(from.root, from.type) : null, cP = chordPcs(c.root, c.type);
+  let s = 0;
+  if (from){
+    const common = cP.filter(x => fP.includes(x)).length;
+    s += mood.wCommon * Math.min(common, 3) / 3;
+    s += mood.wVL * (1 - Math.min(vlDistance(fP, cP), 4) / 4);
+    // Funktion: klassische Stufenfolgen, Auflösung von Dominanten
+    const df = degreeOf(k, from.root), dc = degreeOf(k, c.root);
+    let func = 0;
+    if (df >= 0 && dc >= 0 && c.cat === 'dia') func += ((TRANS[k.mode][df] || {})[dc] || 0) / 5;
+    if (QUAL(from.type) === 'dom' || QUAL(from.type) === 'dim'){
+      const r = resolves(from, c); func += r >= 0.85 ? 1 : -0.35;       // Spannung will aufgelöst werden
+    }
+    if (c.target && c.cat !== 'dia') func += 0.15;
+    s += mood.wFunc * func;
+    if (from.root === c.root && from.type === c.type) s -= 3;
+    if (from.cat && from.cat !== 'dia' && c.cat !== 'dia' && !(QUAL(from.type) === 'dom' && resolves(from, c) >= 0.85)) s -= 0.7;
+  }
+  s += mood.wSur * CAT_SURPRISE[c.cat];
+  s += (mood.cat[c.cat] || 0) + (mood.q[QUAL(c.type)] || 0);
+  if (targetT != null) s -= mood.wT * 2 * Math.abs(chordTension(k, c) - targetT);
+  return s;
+}
 function suggestions(k, root, type){
-  const out = [];
-  const d = root == null ? -1 : degreeOf(k, root);
-  let w = (d >= 0 && TRANS[k.mode][d]) ? TRANS[k.mode][d] : (k.mode === 'maj' ? {0:4,3:3,4:3,5:2} : {0:4,5:3,6:3,3:2});
-  Object.entries(w).sort((a, b) => b[1] - a[1]).forEach(([dd, wt]) => out.push({...diatonic(k, +dd), deg:+dd, w:wt}));
-  return out.slice(0, 5);
+  const from = root == null ? null : {root, type};
+  const cands = netCandidates(k, from).map(c => ({...c, w: scoreLink(k, from, c, MOOD_NEUTRAL, from ? null : 0.2)}));
+  cands.sort((a, b) => b.w - a.w);
+  // Mischung: die besten leitereigenen plus die stärksten „Farben“ aus dem Netzwerk
+  const out = [], used = new Set();
+  const take = c => { const key = c.root + '|' + QUAL(c.type); if (used.has(key) || (from && c.root === root && QUAL(c.type) === QUAL(type))) return; used.add(key); out.push(c); };
+  cands.filter(c => c.cat === 'dia').forEach(c => { if (out.length < 4) take(c); });
+  const colors = cands.filter(c => c.cat !== 'dia'), seenCat = new Set();
+  for (const c of colors){ if (out.length >= 7) break; if (seenCat.has(c.cat)) continue; seenCat.add(c.cat); take(c); }
+  return out.map(c => ({...c, label: c.cat === 'secdom' ? 'V/' + roman(k, c.target.root, c.target.type) :
+                                       c.cat === 'tritone' ? 'subV/' + roman(k, c.target.root, c.target.type) :
+                                       c.cat === 'nr' ? roman(k, c.root, c.type) + ' ' + c.op : roman(k, c.root, c.type),
+                             info: CAT_INFO[c.cat] + (c.op ? ' ' + c.op : '')}));
 }
 function pickW(obj){
   const e = Object.entries(obj).filter(x => x[1] > 0); let sum = e.reduce((a, x) => a + x[1], 0), r = Math.random() * sum;
@@ -486,12 +625,20 @@ function pickW(obj){
 
 /* ---------- Generator ---------- */
 const STYLES = {
-  'Pop':          {mode:null,  beats:[4],   phrase:4, color:{}, boost:{}},
-  'Melancholisch':{mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{}},
-  'Jazz':         {mode:'maj', beats:[2,4], phrase:4, color:{'':[['maj7',3],['maj9',1]], m:[['m7',3],['m9',1]], dim:[['dim',1]]}, dom:'7', boost:{1:{4:4}, 4:{0:4}, 5:{1:2}}},
-  'Lo-Fi':        {mode:null,  beats:[4],   phrase:4, color:{'':[['maj7',2],['maj9',1],['add9',1]], m:[['m7',2],['m9',2]]}, dom:'7', boost:{1:{4:2}}},
-  'Ambient':      {mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{}},
-  'Episch':       {mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}}},
+  'Pop':          {mode:null,  beats:[4],   phrase:4, color:{}, boost:{},
+                   net:{wCommon:0.5, wVL:0.6, wFunc:1.3, wSur:-0.7, wT:0.5, cat:{borrow:0.15, mediant:-0.8, tritone:-0.5}, q:{}, temp:0.35}},
+  'Melancholisch':{mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{},
+                   net:{wCommon:0.8, wVL:0.8, wFunc:0.9, wSur:0, wT:0.4, cat:{borrow:0.6, nr:0.2, mediant:-0.7, tritone:-0.4}, q:{min:0.35, dom:-0.2}, temp:0.4}},
+  'Jazz':         {mode:'maj', beats:[2,4], phrase:4, color:{'':[['maj7',3],['maj9',1]], m:[['m7',3],['m9',1]], dim:[['dim',1]]}, dom:'7', boost:{1:{4:4}, 4:{0:4}, 5:{1:2}},
+                   net:{wCommon:0.4, wVL:0.9, wFunc:1.2, wSur:0.15, wT:0.5, cat:{secdom:0.7, tritone:0.5, borrow:0.2, mediant:-0.3}, q:{dom:0.15}, temp:0.4, alt:true}},
+  'Lo-Fi':        {mode:null,  beats:[4],   phrase:4, color:{'':[['maj7',2],['maj9',1],['add9',1]], m:[['m7',2],['m9',2]]}, dom:'7', boost:{1:{4:2}},
+                   net:{wCommon:0.7, wVL:0.9, wFunc:0.9, wSur:-0.1, wT:0.35, cat:{secdom:0.3, borrow:0.35, mediant:-0.4}, q:{}, temp:0.4}},
+  'Ambient':      {mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{},
+                   net:{wCommon:1.3, wVL:1.1, wFunc:0.3, wSur:0.1, wT:0.6, cat:{nr:0.45, mediant:0.25, secdom:-0.6, tritone:-0.8}, q:{dom:-0.6, dim:-1, aug:-1}, temp:0.45, calm:true}},
+  'Episch':       {mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}},
+                   net:{wCommon:0.7, wVL:0.6, wFunc:0.9, wSur:0.2, wT:0.45, cat:{mediant:0.35, borrow:0.7, nr:0.3}, q:{maj:0.2, dim:-0.6}, temp:0.4}},
+  'Überraschend': {mode:null,  beats:[4],   phrase:4, color:{'':[['',2],['maj7',1],['add9',1]], m:[['m',2],['m7',1],['m9',1]]}, dom:'7', boost:{},
+                   net:{wCommon:0.7, wVL:0.9, wFunc:0.7, wSur:0.9, wT:0.4, cat:{mediant:0.4, nr:0.4, tritone:0.3, borrow:0.3, secdom:0.3}, q:{}, temp:0.5, alt:true}},
 };
 // Farbe wählen, aber nur wenn alle Töne in der Tonart liegen (sonst z. B. Gmaj7 in C-Dur vermeiden)
 function colorize(st, k, d){
@@ -509,23 +656,45 @@ function colorizeRaw(st, mode, d){
   for (const [id, w] of opts){ r -= w; if (r <= 0) return TI(id); }
   return TI(base);
 }
-function genPhrase(st, mode, startDeg, len){
-  const T = TRANS[mode], degs = [startDeg];
-  for (let i = 1; i < len; i++){
-    const prev = degs[i - 1];
-    const w = Object.assign({}, T[prev]);
-    if (st.flat) for (let d = 0; d < 7; d++) w[d] = (w[d] || 0) + 1;
-    if (st.boost[prev]) for (const [d, b] of Object.entries(st.boost[prev])) w[d] = (w[d] || 0) + b;
-    if (st.noDim) delete w[mode === 'maj' ? 6 : 1];
-    delete w[prev];
-    delete w[0];                                   // Tonika nur am Phrasenanfang
-    for (const d in w) if (degs.includes(+d)) w[d] *= 0.2;   // Abwechslung in der Phrase
-    if (i === len - 1){ // letzter Akkord führt zurück zur Tonika
-      for (const d in w) w[d] *= (T[d] && T[d][0] ? T[d][0] : 0.2);
-    }
-    degs.push(Object.keys(w).length ? pickW(w) : 4);
+// Spannungsbogen einer Phrase: aufbauen, auf dem vorletzten/letzten Akkord am höchsten, dann zur Tonika lösen
+function tensionTarget(i, len, mood){
+  const x = i / Math.max(1, len - 1);
+  const peak = mood.calm ? 0.4 : 0.75;
+  return 0.15 + (peak - 0.15) * Math.pow(x, 1.3);
+}
+function softPick(list, temp){
+  const mx = Math.max(...list.map(c => c.w));
+  const ws = list.map(c => Math.exp((c.w - mx) / Math.max(0.05, temp)));
+  let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < list.length; i++){ r -= ws[i]; if (r <= 0) return list[i]; }
+  return list[list.length - 1];
+}
+function extend(st, k, c){
+  const mood = st.net;
+  if (c.cat === 'dia' && c.deg != null && CHORDS[c.type].iv.length === 3){
+    const t = colorize(st, k, c.deg); if (inKey(k, c.root, t)) return t;
   }
-  return degs;
+  if (QUAL(c.type) === 'dom' && mood.alt && Math.random() < 0.35) return TI(['9','13','7b9','7#9'][Math.floor(Math.random() * 4)]);
+  if (QUAL(c.type) === 'dom' && st.dom) return c.type;
+  if (st.color[CHORDS[c.type].id] && Math.random() < 0.5){ const o = st.color[CHORDS[c.type].id]; return TI(o[Math.floor(Math.random() * o.length)][0]); }
+  return c.type;
+}
+function genPhraseNet(st, k, start, len){
+  const mood = st.net, tonic = diatonic(k, 0), out = [{...start}];
+  for (let i = 1; i < len; i++){
+    const prev = out[i - 1];
+    let cands = netCandidates(k, prev).filter(c => !(c.root === prev.root && QUAL(c.type) === QUAL(prev.type)));
+    if (st.noDim) cands = cands.filter(c => QUAL(c.type) !== 'dim');
+    cands = cands.filter(c => !(c.root === tonic.root && QUAL(c.type) === QUAL(tonic.type)));   // Tonika erst wieder am Phrasenanfang
+    const T = tensionTarget(i, len, mood);
+    cands.forEach(c => {
+      c.w = scoreLink(k, prev, c, mood, T);
+      if (out.some(o => o.root === c.root && QUAL(o.type) === QUAL(c.type))) c.w -= 1.2;   // Abwechslung
+      if (i === len - 1) c.w += 1.6 * resolves(c, tonic) * (mood.calm ? 0.6 : 1);           // führt zurück zum Anfang
+    });
+    out.push(softPick(cands, mood.temp));
+  }
+  return out;
 }
 function generate(seconds, styleName, key, exactBeats){
   const st = STYLES[styleName];
@@ -533,23 +702,25 @@ function generate(seconds, styleName, key, exactBeats){
   if (st.mode && st.mode !== k.mode) k = st.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
   let beats = st.beats[Math.floor(Math.random() * st.beats.length)];
   const want = seconds * P.bpm / 60;
-  if (beats * st.phrase > want) beats = st.beats[0];              // kurze Dauer: kürzere Akkorde
-  const unit = beats * st.phrase;                                  // eine Phrase
+  if (beats * st.phrase > want) beats = st.beats[0];
+  const unit = beats * st.phrase;
   let totalBeats = Math.max(unit, Math.round(want / unit) * unit);
   if (exactBeats){ totalBeats = exactBeats; while (beats > 2 && beats * 2 > exactBeats) beats /= 2; }
-  const A = genPhrase(st, k.mode, 0, st.phrase);
-  let bStart = Math.random() < 0.5 ? 3 : 5;
-  if (A[A.length - 1] === bStart) bStart = bStart === 3 ? 5 : 3;
-  const B = genPhrase(st, k.mode, bStart, st.phrase);
-  const form = [A, A, B, A];
-  const colA = A.map(d => colorize(st, k, d)), colB = B.map(d => colorize(st, k, d));
+  const tonic = {...diatonic(k, 0), cat:'dia', deg:0};
+  const A = genPhraseNet(st, k, tonic, st.phrase);
+  // B-Teil beginnt woanders (Subdominante, Parallele oder trugschlüssig), endet aber wieder mit Rückführung
+  const bStartDeg = [3, 5, 1][Math.floor(Math.random() * 3)];
+  let bStart = {...diatonic(k, bStartDeg), cat:'dia', deg:bStartDeg};
+  if (A[A.length - 1].root === bStart.root) bStart = {...diatonic(k, bStartDeg === 3 ? 5 : 3), cat:'dia', deg: bStartDeg === 3 ? 5 : 3};
+  const B = genPhraseNet(st, k, bStart, st.phrase);
+  const colA = A.map(c => extend(st, k, c)), colB = B.map(c => extend(st, k, c));
+  const form = [[A, colA], [A, colA], [B, colB], [A, colA]];
   const out = []; let sum = 0, f = 0;
   while (sum < totalBeats){
-    const ph = form[f % form.length], cols = ph === A ? colA : colB;
+    const [ph, cols] = form[f % form.length];
     for (let i = 0; i < ph.length && sum < totalBeats; i++){
-      const c = diatonic(k, ph[i]);
       const bb = Math.min(beats, totalBeats - sum);
-      out.push({root:c.root, type:cols[i], beats:bb}); sum += bb;
+      out.push({root:ph[i].root, type:cols[i], beats:bb}); sum += bb;
     }
     f++;
   }
@@ -782,11 +953,19 @@ function release(){
   sounding = false;
 }
 let chordHist = [], keyFixed = null;
-function currentKey(){ return keyFixed || guessKey(chordHist); }
+// Tonart: fest gewählt, sonst aus den Loop-Akkorden (wenn vorhanden) bzw. den zuletzt gespielten
+function currentKey(){
+  if (keyFixed) return keyFixed;
+  const loopChords = steps.filter(x => x.root != null).map(x => ({root:x.root, type:x.type}));
+  return guessKey(loopChords.length ? loopChords.slice(0, 16) : chordHist);
+}
 function updateHarmony(){
   const k = currentKey();
   const flatNow = k.mode === 'maj' ? [5,10,3,8,1,6].includes(k.root) : [2,7,0,5,10,3].includes(k.root);
-  if (flatNow !== spellFlat){ spellFlat = flatNow; if (typeof renderSteps === 'function' && els.steps) setTimeout(renderSteps, 0); }
+  const scNow = new Set(scalePcs({root:k.root, mode:k.mode}).slice(0, 7));
+  const changedSpell = flatNow !== spellFlat || !spellScale || [...scNow].some(x => !spellScale.has(x));
+  spellFlat = flatNow; spellScale = scNow; spellRoot = k.root;
+  if (changedSpell && typeof renderSteps === 'function' && els.steps) setTimeout(renderSteps, 0);
   els.keyLabel.textContent = 'Tonart: ' + keyName(k) + (keyFixed ? '' : ' (auto)');
   const sc = new Set(scalePcs(k));
   const sug = suggestions(k, curRoot, curType);
@@ -807,7 +986,8 @@ function updateHarmony(){
   sug.forEach((x, i) => {
     const b = document.createElement('button'); b.className = 'sug' + (i === 0 ? ' best' : '');
     b.append(chordName(x.root, x.type));
-    const n = document.createElement('i'); n.textContent = MODES[k.mode].num[x.deg]; b.append(n);
+    const n = document.createElement('i'); n.textContent = x.label; b.append(n);
+    b.title = x.info; if (x.cat !== 'dia') b.classList.add('color');
     b.addEventListener('pointerdown', e => { e.preventDefault(); playChord(x.root, x.type); });
     b.addEventListener('pointerup', () => { if (!latch && !looping) release(); });
     els.sugs.append(b);
@@ -824,7 +1004,7 @@ function showChord(root, type, notes){
   const q = document.createElement('span'); q.className = 'q'; q.textContent = chordSuffix(type);
   els.chordName.append(r, q);
   const s = document.createElement('small');
-  s.textContent = notes.map(n => noteDisp(n) + (Math.floor(n / 12) - 1)).join(' · ');
+  s.textContent = notes.map(n => toneName(root, type, n) + (Math.floor(n / 12) - 1)).join(' · ');
   els.chordName.append(s);
   if (focusOn){ els.fChord.innerHTML = ''; els.fChord.append(r.cloneNode(true), q.cloneNode(true), s.cloneNode(true)); renderFocusRoots(); renderFocusTypes(); }
   document.querySelectorAll('.roots .pad').forEach((b, i) => b.classList.toggle('sel', i === root));
@@ -1584,7 +1764,7 @@ els.undoBtn.addEventListener('click', undo);
 
 /* ---------- Fokus-Modus ---------- */
 var focusOn = false, lastWrite = null, focusCursor = 0, focusArm = 0;
-['fBars','fGraph','fChord','fStatus','fRoots','fTypes','fBarsSel','fLen','fBpm','fBpmDown','fBpmUp','fUndo','fRedo','fClear','fGen','fSound','fPlay','fExit','fKey']
+['fSugs','fAdvance','fBars','fGraph','fChord','fStatus','fRoots','fTypes','fBarsSel','fLen','fBpm','fBpmDown','fBpmUp','fUndo','fRedo','fClear','fGen','fSound','fPlay','fExit','fKey']
   .forEach(id => els[id] = document.getElementById(id));
 const F_LETTERS = [['C',0],['D',2],['E',4],['F',5],['G',7],['A',9],['B',11]];
 function focusGrid(){
@@ -1598,7 +1778,7 @@ function writeFocus(root, type){
   pushUndo();
   for (let i = focusCursor; i < Math.min(g.length, focusCursor + len); i++) g[i] = {root, type};
   lastWrite = {pos:focusCursor, len, time:performance.now()};
-  focusCursor = (focusCursor + len) % g.length;
+  if (els.fAdvance.checked) focusCursor = (focusCursor + len) % g.length;   // sonst bleibt der gewählte Takt stehen
   steps = fromGrid(g); loopChanged();
 }
 function rewriteLast(root, type){
@@ -1627,7 +1807,10 @@ function renderFocus(){
     cell.addEventListener('click', e => {
       const r = cell.getBoundingClientRect();
       focusCursor = b * 4 + (+els.fLen.value === 2 && e.clientX - r.left > r.width / 2 ? 2 : 0);
-      lastWrite = null; renderFocus();
+      const c = focusGrid()[focusCursor];
+      lastWrite = c ? {pos:focusCursor, len:+els.fLen.value, time:performance.now()} : null;   // vorhandenen Akkord direkt bearbeiten
+      if (c){ curRoot = c.root; curType = c.type; }
+      renderFocus();
     });
     els.fBars.append(cell);
   }
@@ -1635,7 +1818,23 @@ function renderFocus(){
   els.fBpm.textContent = P.bpm + ' BPM';
   const k = currentKey(); els.fKey.textContent = keyName(k);
   updateFocusStatus();
-  renderFocusRoots(); renderFocusTypes();
+  renderFocusRoots(); renderFocusTypes(); renderFocusSugs();
+}
+// Vorschläge für die gewählte Stelle: Bezug ist der Akkord davor im Loop
+function renderFocusSugs(){
+  const g = focusGrid(); let ref = null;
+  for (let d = 1; d <= g.length; d++){ const c = g[(focusCursor - d + g.length * 2) % g.length]; if (c){ ref = c; break; } }
+  const k = currentKey(), list = suggestions(k, ref ? ref.root : null, ref ? ref.type : 0);
+  els.fSugs.innerHTML = '';
+  const here = g[focusCursor];
+  list.forEach((x, i) => {
+    const b = document.createElement('button'); b.className = 'sug' + (i === 0 ? ' best' : '') + (x.cat !== 'dia' ? ' color' : '');
+    if (here && here.root === x.root && here.type === x.type) b.style.outline = '2px solid var(--accent2)';
+    b.append(chordName(x.root, x.type)); const n = document.createElement('i'); n.textContent = x.label; b.append(n); b.title = x.info;
+    b.addEventListener('pointerdown', e => { e.preventDefault(); curType = x.type; playChord(x.root, x.type); });
+    b.addEventListener('pointerup', () => { if (!latch && !looping) release(); });
+    els.fSugs.append(b);
+  });
 }
 function updateFocusStatus(){
   const nb = barCount();
@@ -1645,7 +1844,7 @@ function updateFocusStatus(){
   } else {
     els.fStatus.innerHTML = '';
     els.fStatus.append(`Takt ${Math.floor(focusCursor / 4) + 1}${focusCursor % 4 ? ' (2. Hälfte)' : ''} ausgewählt`);
-    els.fStatus.append(document.createElement('br'), 'Buchstabe setzt den Akkord, Typ/♭/♯ ändern ihn danach.');
+    els.fStatus.append(document.createElement('br'), 'Buchstabe oder Vorschlag setzt den Akkord, Typ/♭/♯ ändern ihn. Nächsten Takt oben antippen.');
   }
 }
 function renderFocusRoots(){
@@ -1757,6 +1956,8 @@ els.fBpmDown.addEventListener('click', () => bpmBy(-2));
 els.fBpmUp.addEventListener('click', () => bpmBy(2));
 els.fGen.addEventListener('click', () => { runGenerator(0, barCount() * 4); focusCursor = 0; lastWrite = null; });
 els.fSound.addEventListener('click', () => { setFocus(false); showTab('sound'); });
+try { els.fAdvance.checked = localStorage.getItem('chordwave.advance') === '1'; } catch(e){}
+els.fAdvance.addEventListener('change', () => { try { localStorage.setItem('chordwave.advance', els.fAdvance.checked ? '1' : '0'); } catch(e){} });
 
 syncUI(); renderSteps(); updateHarmony(); updUndo();
 requestAnimationFrame(draw);
