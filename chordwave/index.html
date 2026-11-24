@@ -107,6 +107,48 @@ input[type=number]{width:72px}
 input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 .group{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em;grid-column:1/-1;margin-top:8px}
 .hint{color:var(--dim);font-size:12px;margin:0}
+/* Loop-Leiste mit Fokus-Knopf */
+.looprow{flex:0 0 auto;display:flex;gap:6px;align-items:stretch}
+.looprow .steps{flex:1;min-width:0}
+#focusBtn{flex:0 0 auto;height:40px;padding:0 10px;font-size:13px;font-weight:600;border-color:var(--accent2);color:var(--accent2)}
+/* Fokus-Modus */
+body.focus #app{display:none}
+#focus{display:none;position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:5;
+  padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+body.focus #focus{display:block}
+#focus .fin{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.fhead{display:flex;align-items:center;gap:6px}
+.fhead h2{margin:0 auto 0 0;font-size:17px}
+.fhead h2 span{color:var(--accent2);font-weight:500;font-size:13px;margin-left:6px}
+.fhead button{height:38px;min-width:42px;padding:0 10px}
+.fbars{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:150px;overflow-y:auto}
+.fbar{position:relative;height:62px;border-radius:12px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:4px;padding:0 4px;font-weight:700;font-size:16px;overflow:hidden}
+.fbar .no{position:absolute;left:7px;top:4px;font-size:10px;color:var(--dim);font-weight:500}
+.fbar .half{flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.fbar .half+.half{border-left:1px solid var(--line)}
+.fbar .empty2{color:var(--dim);font-weight:400}
+.fbar.cur{border:2px solid var(--accent2)}
+.fbar.play{background:#232042;border-color:var(--accent)}
+.fbar .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:0}
+#fGraph{width:100%;height:150px;display:block;background:#07060c;border:1px solid var(--line);border-radius:12px}
+.finfo{display:flex;align-items:baseline;gap:12px;min-height:44px}
+.finfo .chordname .r{font-size:34px}
+.finfo .chordname .q{font-size:20px}
+.fstatus{font-size:12px;color:var(--dim);line-height:1.35}
+.froots{display:grid;grid-template-columns:repeat(9,1fr);gap:5px}
+.froots button{height:46px;padding:0;font-size:18px;font-weight:700;border-radius:10px}
+.froots button.acc{font-size:20px;color:var(--accent2)}
+.froots button.armed{background:var(--accent2);color:#0b0a12}
+.froots button.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.ftypes{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.ftypes button{height:42px;padding:0 2px;font-size:13px;font-weight:600;border-radius:9px;white-space:nowrap;overflow:hidden}
+.ftypes button.sel{outline:2px solid var(--accent2);outline-offset:-2px}
+.fctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fctl select{height:38px}
+.fctl .bpm{display:flex;align-items:center;gap:4px}
+.fctl .bpm button{width:36px;height:38px;padding:0}
+.fctl .bpm span{min-width:62px;text-align:center;font-weight:600}
+.fctl .sp{flex:1}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:9}
 #toast.show{opacity:1}
 @media (max-height:700px){ .vtop{height:96px} .chordname .r{font-size:30px} .chordname .q{font-size:17px} #piano{height:48px} .pad{min-height:34px} }
@@ -143,7 +185,10 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
   <span class="val" id="quickGlideVal"></span>
 </div>
 
-<div class="steps" id="steps"></div>
+<div class="looprow">
+  <button id="focusBtn" title="Fokus-Modus: Loop Takt für Takt bauen">⛶ Fokus</button>
+  <div class="steps" id="steps"></div>
+</div>
 
 <nav class="tabs">
   <button data-tab="play" class="on">Akkorde</button>
@@ -167,6 +212,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
     <div class="box">
       <div class="row">
         <label>Tempo <input type="number" id="bpm" min="40" max="240" value="90"> BPM</label>
+        <label>Takte <select id="loopBars"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
         <label>Neue Akkorde <select id="stepBeats">
           <option value="1">1 Schlag</option><option value="2">2 Schläge</option>
           <option value="4" selected>1 Takt</option><option value="8">2 Takte</option></select></label>
@@ -188,7 +234,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
       </div>
       <div class="row">
         <button id="genBtn" class="on">✨ Abfolge erzeugen</button>
-        <button id="undoBtn" disabled>Rückgängig</button>
+        <button id="undoBtn" disabled>↶ Rückgängig</button>
       </div>
       <p class="hint">Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab.</p>
     </div>
@@ -233,6 +279,33 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
 </main>
 </div>
 
+<div id="focus">
+ <div class="fin">
+  <div class="fhead">
+    <h2>Fokus<span id="fKey"></span></h2>
+    <button id="fPlay" title="Loop abspielen">▶</button>
+    <button id="fExit" title="Fokus-Modus verlassen">✕</button>
+  </div>
+  <div class="fbars" id="fBars"></div>
+  <canvas id="fGraph"></canvas>
+  <div class="finfo"><div class="chordname" id="fChord"><span class="r">–</span></div><div class="fstatus" id="fStatus"></div></div>
+  <div class="froots" id="fRoots"></div>
+  <div class="ftypes" id="fTypes"></div>
+  <div class="fctl">
+    <select id="fBarsSel" title="Anzahl Takte"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="3">3 Takte</option><option value="4">4 Takte</option><option value="5">5 Takte</option><option value="6">6 Takte</option><option value="7">7 Takte</option><option value="8">8 Takte</option></select>
+    <select id="fLen" title="Länge eines neuen Akkords"><option value="4">1 Takt</option><option value="2">½ Takt</option></select>
+    <span class="bpm"><button id="fBpmDown">−</button><span id="fBpm"></span><button id="fBpmUp">+</button></span>
+  </div>
+  <div class="fctl">
+    <button id="fUndo" disabled>↶</button><button id="fRedo" disabled>↷</button>
+    <button id="fClear">Leeren</button>
+    <button id="fGen" title="Abfolge für alle Takte erzeugen (Stil wie im Loop-Tab)">✨ Erzeugen</button>
+    <span class="sp"></span>
+    <button id="fSound">Sound</button>
+  </div>
+ </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -252,13 +325,32 @@ const CHORDS = [
   {id:'maj9', label:'maj9',  iv:[0,4,7,11,14]},
   {id:'dim',  label:'dim',   iv:[0,3,6]},
   {id:'aug',  label:'aug',   iv:[0,4,8]},
+  // erweiterte Typen (Fokus-Modus)
+  {id:'m7b5', label:'m7♭5', disp:'m7♭5', iv:[0,3,6,10]},
+  {id:'dim7', label:'dim7',  iv:[0,3,6,9]},
+  {id:'7sus4',label:'7sus4', iv:[0,5,7,10]},
+  {id:'6',    label:'6',     iv:[0,4,7,9]},
+  {id:'m6',   label:'m6',    iv:[0,3,7,9]},
+  {id:'6/9',  label:'6/9',   iv:[0,4,7,9,14]},
+  {id:'9',    label:'9',     iv:[0,4,7,10,14]},
+  {id:'13',   label:'13',    iv:[0,4,7,10,14,21]},
+  {id:'m11',  label:'m11',   iv:[0,3,7,10,14,17]},
+  {id:'7b9',  label:'7♭9', disp:'7♭9', iv:[0,4,7,10,13]},
+  {id:'7#9',  label:'7♯9', disp:'7♯9', iv:[0,4,7,10,15]},
+  {id:'maj7#11', label:'maj7♯11', disp:'maj7♯11', iv:[0,4,7,11,18]},
 ];
 const ROOT_CODES = ['KeyA','KeyW','KeyS','KeyE','KeyD','KeyF','KeyT','KeyG','KeyY','KeyH','KeyU','KeyJ'];
 const TYPE_CODES = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal'];
 const US_LABELS = {KeyA:'A',KeyW:'W',KeyS:'S',KeyE:'E',KeyD:'D',KeyF:'F',KeyT:'T',KeyG:'G',KeyY:'Y',KeyH:'H',KeyU:'U',KeyJ:'J',
   Digit1:'1',Digit2:'2',Digit3:'3',Digit4:'4',Digit5:'5',Digit6:'6',Digit7:'7',Digit8:'8',Digit9:'9',Digit0:'0',Minus:'-',Equal:'='};
 
-const chordName = (root, t) => NOTE_NAMES[root] + CHORDS[t].id;
+const chordSuffix = t => CHORDS[t].disp ?? CHORDS[t].id;
+const SHARP_DISP = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const FLAT_DISP  = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
+let spellFlat = false;            // B-Tonarten: B♭ statt A♯
+const noteDisp = pc => (spellFlat ? FLAT_DISP : SHARP_DISP)[((pc % 12) + 12) % 12];
+const chordName = (root, t) => noteDisp(root) + chordSuffix(t);
+const BASIC_TYPES = 12;
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 const ftom = f => 69 + 12 * Math.log2(f / 440);
 
@@ -357,7 +449,7 @@ const TRANS = {
   min: {0:{3:3,5:3,6:3,4:2,2:1}, 1:{4:4,6:1}, 2:{5:3,3:2,6:2}, 3:{4:3,0:3,6:2,1:1}, 4:{0:5,5:2}, 5:{3:2,6:3,2:2,1:1}, 6:{2:3,0:3,5:1}},
 };
 const KEYS = []; for (const m of ['maj','min']) for (let r = 0; r < 12; r++) KEYS.push({root:r, mode:m});
-const keyName = k => NOTE_NAMES[k.root] + '-' + MODES[k.mode].name;
+const keyName = k => (k.mode === 'maj' ? [5,10,3,8,1,6] : [2,7,0,5,10,3]).includes(k.root) ? FLAT_DISP[k.root] + '-' + MODES[k.mode].name : SHARP_DISP[k.root] + '-' + MODES[k.mode].name;
 function scalePcs(k){ const M = MODES[k.mode]; return M.steps.concat(M.extra).map(x => (x + k.root) % 12); }
 function degreeOf(k, root){ return MODES[k.mode].steps.findIndex(x => (x + k.root) % 12 === root); }
 function diatonic(k, d){ return {root:(MODES[k.mode].steps[d] + k.root) % 12, type:TI(MODES[k.mode].q[d])}; }
@@ -435,7 +527,7 @@ function genPhrase(st, mode, startDeg, len){
   }
   return degs;
 }
-function generate(seconds, styleName, key){
+function generate(seconds, styleName, key, exactBeats){
   const st = STYLES[styleName];
   let k = {...key};
   if (st.mode && st.mode !== k.mode) k = st.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
@@ -443,7 +535,8 @@ function generate(seconds, styleName, key){
   const want = seconds * P.bpm / 60;
   if (beats * st.phrase > want) beats = st.beats[0];              // kurze Dauer: kürzere Akkorde
   const unit = beats * st.phrase;                                  // eine Phrase
-  const totalBeats = Math.max(unit, Math.round(want / unit) * unit);
+  let totalBeats = Math.max(unit, Math.round(want / unit) * unit);
+  if (exactBeats){ totalBeats = exactBeats; while (beats > 2 && beats * 2 > exactBeats) beats /= 2; }
   const A = genPhrase(st, k.mode, 0, st.phrase);
   let bStart = Math.random() < 0.5 ? 3 : 5;
   if (A[A.length - 1] === bStart) bStart = bStart === 3 ? 5 : 3;
@@ -455,7 +548,8 @@ function generate(seconds, styleName, key){
     const ph = form[f % form.length], cols = ph === A ? colA : colB;
     for (let i = 0; i < ph.length && sum < totalBeats; i++){
       const c = diatonic(k, ph[i]);
-      out.push({root:c.root, type:cols[i], beats}); sum += beats;
+      const bb = Math.min(beats, totalBeats - sum);
+      out.push({root:c.root, type:cols[i], beats:bb}); sum += bb;
     }
     f++;
   }
@@ -558,18 +652,22 @@ class Engine{
     }
     v.from = cur; v.to = f; v.t0 = t; v.t1 = t + Math.max(glide, 0.0001);
   }
-  play(voiced, t){
-    const p = this.p;
-    const glide = this.gate ? p.glide : 0;
+  // offs: Versatz je Stimme in Sekunden, glides: Gleitzeit je Stimme (beides optional)
+  play(voiced, t, offs, glides){
+    const p = this.p, was = this.gate;
     const all = voiced.notes.slice();
     const strum = p.strum || 0;
     for (let i = 0; i < MAX_VOICES; i++){
-      const n = all[Math.min(i, all.length - 1)];
-      this.glideVoice(this.voices[i], mtof(n), t + Math.min(i, all.length - 1) * strum, glide);
+      const j = Math.min(i, all.length - 1);
+      const ti = !was ? t : t + (offs ? offs[j] : j * strum);
+      const gl = !was ? 0 : (glides ? glides[j] : p.glide);
+      this.glideVoice(this.voices[i], mtof(all[j]), ti, gl);
     }
+    const glide = was ? p.glide : 0;
     this.glideVoice(this.voices[MAX_VOICES], mtof(voiced.bass), t, glide);
     if (!this.gate || p.retrig) this.gateOn(t);
   }
+  moveVoice(i, note, t, glide){ this.glideVoice(this.voices[i], mtof(note), t, this.gate ? glide : 0); }
   gateOn(t){
     const p = this.p, g = this.amp.gain;
     ramp(g, t);
@@ -588,7 +686,7 @@ class Engine{
 /* ---------- Parameter, Presets ---------- */
 const DEFAULTS = {wave:'sawtooth', detune:10, voices:4, octave:0, glide:0.35, attack:0.08, decay:0.6, sustain:0.8, release:1.2,
   retrig:false, cutoff:1800, res:3, lfoRate:0.25, lfoDepth:0.15, verbMix:0.35, verbSize:3, delMix:0.12, delFb:0.35, delBeats:0.75,
-  bass:true, bassLevel:0.6, volume:0.7, strum:0, bpm:90, latency:'playback'};
+  bass:true, bassLevel:0.6, volume:0.7, strum:0, stagger:0.4, motion:0.5, bpm:90, latency:'playback'};
 const PRESETS = {
   'Weiches Pad': {},
   'Glas-Keys': {wave:'triangle', detune:4, glide:0.15, attack:0.005, decay:0.9, sustain:0.35, release:1.4, retrig:true, cutoff:5000, res:1, lfoDepth:0, verbMix:0.3, delMix:0.18},
@@ -621,6 +719,9 @@ const KNOBS = [
   ['delMix','Echo',0,0.8,0.01, v=>Math.round(v*100)+'%'],
   ['delFb','Echo-Rückkopplung',0,0.9,0.01, v=>Math.round(v*100)+'%'],
   ['delBeats','Echo-Zeit',0.25,2,0.25, v=>({0.25:'1/16',0.5:'1/8',0.75:'1/8 punkt.',1:'1/4',1.5:'1/4 punkt.',2:'1/2'}[v]||v+' Schl.')],
+  ['Loop-Bewegung'],
+  ['stagger','Versatz der Stimmen',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['motion','Bewegung im Akkord',0,1,0.01, v=>Math.round(v*100)+'%'],
   ['volume','Lautstärke',0,1,0.01, v=>Math.round(v*100)+'%'],
 ];
 
@@ -630,6 +731,8 @@ let saved = {};
 try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch(e){}
 const P = Object.assign({}, DEFAULTS, saved.p || {});
 let steps = Array.isArray(saved.steps) ? saved.steps : [];
+let loopSeed = typeof saved.seed === 'number' ? saved.seed : Math.floor(Math.random() * 1e6);
+let barsPref = saved.bars || 4;
 let latch = saved.latch !== false;
 let saveTimer = 0;
 function save(){
@@ -637,7 +740,7 @@ function save(){
   saveTimer = setTimeout(saveNow, 300);
 }
 function saveNow(){
-  try { localStorage.setItem(STORE, JSON.stringify({p:P, steps, latch, preset: els.preset ? els.preset.value : undefined})); } catch(e){}
+  try { localStorage.setItem(STORE, JSON.stringify({p:P, steps, latch, seed:loopSeed, bars:barsPref, preset: els.preset ? els.preset.value : undefined})); } catch(e){}
 }
 
 /* ---------- Audio-Kontext ---------- */
@@ -670,7 +773,8 @@ function playChord(root, type, noRecord, when){
   engine.play(v, t); mark(t, root, type);
   sounding = true;
   showChord(root, type, v.notes);
-  if (!noRecord && recording) addStep({root, type, beats:+els.stepBeats.value});
+  if (!noRecord && focusOn) writeFocus(root, type);
+  else if (!noRecord && recording) addStep({root, type, beats:+els.stepBeats.value});
 }
 function release(){
   if (!engine) return;
@@ -681,6 +785,8 @@ let chordHist = [], keyFixed = null;
 function currentKey(){ return keyFixed || guessKey(chordHist); }
 function updateHarmony(){
   const k = currentKey();
+  const flatNow = k.mode === 'maj' ? [5,10,3,8,1,6].includes(k.root) : [2,7,0,5,10,3].includes(k.root);
+  if (flatNow !== spellFlat){ spellFlat = flatNow; if (typeof renderSteps === 'function' && els.steps) setTimeout(renderSteps, 0); }
   els.keyLabel.textContent = 'Tonart: ' + keyName(k) + (keyFixed ? '' : ' (auto)');
   const sc = new Set(scalePcs(k));
   const sug = suggestions(k, curRoot, curType);
@@ -714,12 +820,13 @@ function showChord(root, type, notes){
   curRoot = root; curType = type;
   updateHarmony();
   els.chordName.innerHTML = '';
-  const r = document.createElement('span'); r.className = 'r'; r.textContent = NOTE_NAMES[root];
-  const q = document.createElement('span'); q.className = 'q'; q.textContent = CHORDS[type].id;
+  const r = document.createElement('span'); r.className = 'r'; r.textContent = noteDisp(root);
+  const q = document.createElement('span'); q.className = 'q'; q.textContent = chordSuffix(type);
   els.chordName.append(r, q);
   const s = document.createElement('small');
-  s.textContent = notes.map(n => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1)).join(' · ');
+  s.textContent = notes.map(n => noteDisp(n) + (Math.floor(n / 12) - 1)).join(' · ');
   els.chordName.append(s);
+  if (focusOn){ els.fChord.innerHTML = ''; els.fChord.append(r.cloneNode(true), q.cloneNode(true), s.cloneNode(true)); renderFocusRoots(); renderFocusTypes(); }
   document.querySelectorAll('.roots .pad').forEach((b, i) => b.classList.toggle('sel', i === root));
   document.querySelectorAll('.types .pad').forEach((b, i) => b.classList.toggle('sel', i === type));
 }
@@ -731,11 +838,100 @@ function stopAll(){
 }
 
 /* ---------- Loop ---------- */
-let recording = false, looping = false, loopIdx = 0, nextTime = 0, loopTimer = 0;
-function addStep(s){ steps.push(s); renderSteps(); save(); }
+let recording = false, looping = false, loopTimer = 0;
+// deterministische Zufallszahl (gleicher Loop = gleiche Bewegung, in Anzeige, Klang und Export)
+function srand(a, b){ const x = Math.sin((a + 1) * 127.1 + (b + 1) * 311.7 + loopSeed * 0.013) * 43758.5453; return x - Math.floor(x); }
+// eine Stimme wandert innerhalb des Akkords zum Nachbar-Akkordton
+function innerMove(notes, root, type, k){
+  const pcs = new Set(chordPcs(root, type)), n = notes.length, need = new Set(targetPcs(root, type, n));
+  const start = Math.floor(srand(k, 77) * n);
+  for (let a = 0; a < n; a++){
+    const i = (start + a) % n;
+    for (const d of (srand(k, 76) < 0.5 ? [1, -1] : [-1, 1])){
+      let x = notes[i] + d;
+      while (Math.abs(x - notes[i]) <= 5 && !pcs.has(((x % 12) + 12) % 12)) x += d;
+      if (Math.abs(x - notes[i]) > 5) continue;
+      if ((i > 0 && x <= notes[i - 1]) || (i < n - 1 && x >= notes[i + 1])) continue;
+      const nn = notes.slice(); nn[i] = x;
+      const have = new Set(nn.map(y => ((y % 12) + 12) % 12));
+      if ([...need].every(q => have.has(q))) return {i, note:x};
+    }
+  }
+  return null;
+}
+// Aus den Loop-Schritten eine Ereignisliste bauen (2 Durchläufe simulieren, den eingeschwungenen nehmen)
+function buildLoopEvents(st, p){
+  const vl = new VoiceLeader(); let out = [], total = 0;
+  for (let pass = 0; pass < 2; pass++){
+    out = []; let b = 0;
+    st.forEach((s, k) => {
+      const L = s.beats;
+      if (s.root == null){ out.push({b, k, kind:'off'}); b += L; return; }
+      const before = vl.prev ? vl.prev.slice() : null;
+      const v = vl.next(s.root, s.type, p), n = v.notes.length;
+      const offs = v.notes.map((x, i) => (before && before.length === n && before[i] !== x) ? srand(k, i) * p.stagger * Math.min(L, 4) * 0.5 : 0);
+      const glides = v.notes.map((x, i) => p.glide * (0.7 + 0.6 * srand(k, i + 20)));
+      out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:v.notes.slice(), bass:v.bass, offs, glides});
+      if (p.motion > 0 && L >= 4 && srand(k, 99) < p.motion){
+        const mv = innerMove(v.notes, s.root, s.type, k);
+        if (mv){ out.push({b: b + L / 2 + srand(k, 98) * 0.5, k, kind:'move', i:mv.i, note:mv.note, glide:Math.max(0.15, p.glide * 1.2)}); vl.prev[mv.i] = mv.note; }
+      }
+      b += L;
+    });
+    total = b;
+  }
+  return {events: out, beats: total};
+}
+function playEvent(eng, ev, t, spb, live){
+  if (ev.kind === 'off'){ eng.gateOff(t); if (live) uiAt(t, () => markPlaying(ev.k)); return; }
+  if (ev.kind === 'move'){ eng.moveVoice(ev.i, ev.note, t, ev.glide); if (live && leader.prev && leader.prev.length > ev.i) leader.prev[ev.i] = ev.note; return; }
+  eng.play({notes:ev.notes, bass:ev.bass}, t, ev.offs.map(o => o * spb), ev.glides);
+  if (live){
+    leader.prev = ev.notes.slice(); mark(t, ev.root, ev.type);
+    uiAt(t, () => { if (looping){ showChord(ev.root, ev.type, ev.notes); markPlaying(ev.k); } });
+  }
+}
+function uiAt(t, fn){ setTimeout(fn, Math.max(0, (t - ctx.currentTime) * 1000)); }
+
+// --- Rückgängig / Wiederholen für alle Loop-Änderungen ---
+let undoStack = [], redoStack = [];
+function pushUndo(){ undoStack.push(JSON.stringify(steps)); if (undoStack.length > 80) undoStack.shift(); redoStack = []; updUndo(); }
+function undo(){ if (!undoStack.length) return; redoStack.push(JSON.stringify(steps)); steps = JSON.parse(undoStack.pop()); loopChanged(); }
+function redo(){ if (!redoStack.length) return; undoStack.push(JSON.stringify(steps)); steps = JSON.parse(redoStack.pop()); loopChanged(); }
+function updUndo(){
+  for (const id of ['undoBtn','fUndo']) if (els[id]) els[id].disabled = !undoStack.length;
+  if (els.fRedo) els.fRedo.disabled = !redoStack.length;
+}
+function loopChanged(){ renderSteps(); save(); updUndo(); }
+function addStep(s){ pushUndo(); steps.push(s); loopChanged(); }
+
+// --- Takt-Raster: Loop als Liste von Schlägen ---
+function toGrid(st){ const g = []; st.forEach(s => { for (let i = 0; i < s.beats; i++) g.push(s.root == null ? null : {root:s.root, type:s.type}); }); return g; }
+function fromGrid(g){
+  const out = [];
+  g.forEach(c => {
+    const last = out[out.length - 1];
+    const same = last && ((last.root == null && c == null) || (c && last.root === c.root && last.type === c.type));
+    if (same) last.beats++; else out.push(c ? {root:c.root, type:c.type, beats:1} : {root:null, type:0, beats:1});
+  });
+  return out;
+}
+const loopBeats = () => steps.reduce((a, s) => a + s.beats, 0);
+const loopIsEmpty = () => !steps.some(s => s.root != null);
+function barCount(){ return steps.length ? Math.max(1, Math.ceil(loopBeats() / 4)) : barsPref; }
+function setBars(n){
+  barsPref = n;
+  if (!steps.length){ renderSteps(); save(); return; }
+  pushUndo();
+  const g = toGrid(steps).slice(0, n * 4);
+  while (g.length < n * 4) g.push(null);
+  steps = fromGrid(g); loopChanged();
+}
+
 let selStep = -1;
 function stepLabel(st){ return st.root == null ? 'Pause' : chordName(st.root, st.type); }
 function renderSteps(){
+  markLoopDirty();
   const box = els.steps; box.innerHTML = '';
   if (selStep >= steps.length) selStep = steps.length - 1;
   if (!steps.length){
@@ -751,6 +947,14 @@ function renderSteps(){
     box.append(d);
   });
   renderStepEdit();
+  if (els.loopBars) syncBarsSelect(els.loopBars);
+  if (typeof renderFocus === 'function') renderFocus();
+}
+function syncBarsSelect(sel){
+  const n = barCount();
+  [...sel.querySelectorAll('option.extra')].forEach(o => o.remove());
+  if (n > 8){ const o = document.createElement('option'); o.className = 'extra'; o.value = n; o.textContent = n + ' Takte'; sel.append(o); }
+  sel.value = n;
 }
 function renderStepEdit(){
   const ed = els.stepEdit; ed.innerHTML = '';
@@ -763,7 +967,7 @@ function renderStepEdit(){
   const row = document.createElement('div'); row.className = 'row';
   const name = document.createElement('b'); name.textContent = stepLabel(st);
   const len = document.createElement('span'); len.textContent = st.beats + (st.beats === 1 ? ' Schlag' : ' Schläge');
-  const mk = (t, f) => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { f(); renderSteps(); save(); }; return b; };
+  const mk = (t, f) => { const b = document.createElement('button'); b.textContent = t; b.onclick = () => { pushUndo(); f(); loopChanged(); }; return b; };
   row.append(name,
     mk('−', () => { st.beats = Math.max(1, st.beats - 1); }), len,
     mk('+', () => { st.beats = Math.min(16, st.beats + 1); }),
@@ -772,34 +976,56 @@ function renderStepEdit(){
     mk('Löschen', () => { steps.splice(selStep, 1); selStep = Math.min(selStep, steps.length - 1); }));
   ed.append(row);
 }
+let playingStep = -1;
+function markPlaying(k){ playingStep = k; markStep(k); }
 function markStep(i){
   els.steps.querySelectorAll('.step').forEach(el => el.classList.toggle('now', +el.dataset.i === i));
   const el = els.steps.querySelector('.step.now');
   if (el) els.steps.scrollTo({left: el.offsetLeft - els.steps.clientWidth / 2 + el.offsetWidth / 2, behavior:'smooth'});
 }
+
+// --- Abspielen: Ereignisse vorausplanen ---
+let loopEv = null, loopDirty = true, evIdx = 0, cycleStart = 0, cycleSpb = 0.5;
+function markLoopDirty(){ loopDirty = true; }
+function ensureEvents(){ if (loopDirty || !loopEv){ loopEv = buildLoopEvents(steps, P); loopDirty = false; } return loopEv; }
+function loopPos(){ return looping && ctx ? (ctx.currentTime - cycleStart) / cycleSpb : -1; }
 function startLoop(){
-  if (!steps.length){ toast('Der Loop ist noch leer – erst Akkorde aufnehmen.'); return; }
+  if (loopIsEmpty()){ toast('Der Loop ist noch leer – erst Akkorde aufnehmen.'); return; }
   ensureAudio();
-  looping = true; loopIdx = 0; nextTime = ctx.currentTime + 0.08;
-  els.playBtn.classList.add('on'); els.playBtn.textContent = '❚❚';
+  loopDirty = true; ensureEvents();
+  looping = true; evIdx = 0; cycleSpb = 60 / P.bpm; cycleStart = ctx.currentTime + 0.08;
+  for (const id of ['playBtn','fPlay']) if (els[id]){ els[id].classList.add('on'); els[id].textContent = '❚❚'; }
   tick(); loopTimer = setInterval(tick, 25);
 }
 function tick(){
-  if (looping && nextTime < ctx.currentTime - 0.05) nextTime = ctx.currentTime + 0.05;
-  while (looping && nextTime < ctx.currentTime + 0.12){
-    if (loopIdx >= steps.length) loopIdx = 0;
-    const s = steps[loopIdx], t = nextTime, i = loopIdx;
-    if (s.root == null) engine.gateOff(t);
-    else { const v = leader.next(s.root, s.type, P); engine.play(v, t); mark(t, s.root, s.type); setTimeout(() => { if (looping) { showChord(s.root, s.type, v.notes); } }, Math.max(0, (t - ctx.currentTime) * 1000)); }
-    setTimeout(() => { if (looping) markStep(i); }, Math.max(0, (t - ctx.currentTime) * 1000));
-    nextTime += s.beats * 60 / P.bpm;
-    loopIdx++;
+  if (!looping) return;
+  const now = ctx.currentTime;
+  if (loopDirty){                       // Loop wurde geändert: ab der aktuellen Position weiter
+    const pos = (now - cycleStart) / cycleSpb;
+    ensureEvents();
+    evIdx = loopEv.events.findIndex(e => e.b >= pos); if (evIdx < 0) evIdx = loopEv.events.length;
+  }
+  // nach Hintergrund nicht alles auf einmal nachholen
+  const nextB = loopEv.events[evIdx] ? loopEv.events[evIdx].b : loopEv.beats;
+  if (cycleStart + nextB * cycleSpb < now - 0.25) cycleStart = now + 0.05 - nextB * cycleSpb;
+  let guard = 0;
+  while (looping && guard++ < 400){
+    if (evIdx >= loopEv.events.length){
+      cycleStart += loopEv.beats * cycleSpb; evIdx = 0;
+      if (cycleSpb !== 60 / P.bpm){ cycleSpb = 60 / P.bpm; }
+      ensureEvents();
+      if (!loopEv.events.length || loopIsEmpty()){ stopLoop(); return; }
+    }
+    const ev = loopEv.events[evIdx], t = cycleStart + ev.b * cycleSpb;
+    if (t > now + 0.12) break;
+    playEvent(engine, ev, Math.max(t, now + 0.005), cycleSpb, true);
+    evIdx++;
   }
 }
 function stopLoop(){
   looping = false; clearInterval(loopTimer);
-  els.playBtn.classList.remove('on'); els.playBtn.textContent = '▶';
-  markStep(-1); release();
+  for (const id of ['playBtn','fPlay']) if (els[id]){ els[id].classList.remove('on'); els[id].textContent = '▶'; }
+  markPlaying(-1); release();
 }
 
 /* ---------- Export ---------- */
@@ -809,10 +1035,10 @@ function download(blob, name){
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
-function loopSeconds(){ return steps.reduce((a, s) => a + s.beats, 0) * 60 / P.bpm; }
+function loopSeconds(){ return loopBeats() * 60 / P.bpm; }
 async function exportWav(){
-  if (!steps.length){ toast('Der Loop ist leer.'); return; }
-  const passes = +els.passes.value, sr = 44100;
+  if (loopIsEmpty()){ toast('Der Loop ist leer.'); return; }
+  const passes = +els.passes.value, sr = 44100, spb = 60 / P.bpm;
   const tail = P.release + P.verbSize + (P.delMix > 0 ? 2 : 0) + 0.5;
   const dur = loopSeconds() * passes + tail;
   if (dur > 600){ toast('Zu lang für den Export (max. 10 Minuten).'); return; }
@@ -820,13 +1046,10 @@ async function exportWav(){
   const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   const octx = new Off(2, Math.ceil(dur * sr), sr);
   const eng = new Engine(octx, P);
-  const vl = new VoiceLeader();
-  let t = 0.02;
-  for (let k = 0; k < passes; k++) for (const s of steps){
-    if (s.root == null) eng.gateOff(t); else eng.play(vl.next(s.root, s.type, P), t);
-    t += s.beats * 60 / P.bpm;
-  }
-  eng.gateOff(t);
+  const {events, beats} = buildLoopEvents(steps, P);
+  const t0 = 0.02;
+  for (let k = 0; k < passes; k++) for (const ev of events) playEvent(eng, ev, t0 + (k * beats + ev.b) * spb, spb, false);
+  eng.gateOff(t0 + passes * beats * spb);
   const buf = await octx.startRendering();
   download(encodeWav(buf), 'chordwave-loop.wav');
   toast('WAV gespeichert.');
@@ -850,21 +1073,27 @@ function encodeWav(buf){
   return new Blob([ab], {type:'audio/wav'});
 }
 function exportMidi(){
-  if (!steps.length){ toast('Der Loop ist leer.'); return; }
-  const PPQ = 480, passes = +els.passes.value, vl = new VoiceLeader(), ev = [];
-  let tick = 0;
-  for (let k = 0; k < passes; k++) for (const s of steps){
-    const len = s.beats * PPQ;
-    if (s.root != null){
-      const v = vl.next(s.root, s.type, P);
-      const notes = [...new Set(v.notes)];
-      if (P.bass) notes.push(v.bass);
-      for (const n of notes){
-        ev.push({t:tick, d:[0x90, n, n === v.bass && P.bass ? 85 : 92], off:0});
-        ev.push({t:tick + len - 1, d:[0x80, n, 0], off:1});
-      }
-    }
-    tick += len;
+  if (loopIsEmpty()){ toast('Der Loop ist leer.'); return; }
+  const PPQ = 480, passes = +els.passes.value, ev = [];
+  const {events, beats} = buildLoopEvents(steps, P);
+  const BASS = MAX_VOICES, acts = [];          // {t, v, n}: Stimme v spielt ab t Note n (null = aus)
+  for (let k = 0; k < passes; k++) for (const e of events){
+    const tk = (k * beats + e.b) * PPQ;
+    if (e.kind === 'off'){ for (let v = 0; v <= BASS; v++) acts.push({t:tk, v, n:null}); continue; }
+    if (e.kind === 'move'){ acts.push({t:tk, v:e.i, n:e.note}); continue; }
+    e.notes.forEach((n, v) => acts.push({t:Math.round(tk + e.offs[v] * PPQ), v, n}));
+    for (let v = e.notes.length; v < MAX_VOICES; v++) acts.push({t:tk, v, n:null});
+    acts.push({t:tk, v:BASS, n: P.bass ? e.bass : null});
+  }
+  const end = passes * beats * PPQ;
+  for (let v = 0; v <= BASS; v++) acts.push({t:end, v, n:null});
+  acts.sort((a, b) => a.t - b.t);
+  const cur = new Array(BASS + 1).fill(null), cnt = {};
+  for (const a of acts){
+    if (cur[a.v] === a.n) continue;
+    if (cur[a.v] != null){ const o = cur[a.v]; cnt[o]--; if (!cnt[o]) ev.push({t:Math.max(0, a.t - 1), d:[0x80, o, 0], off:1}); }
+    if (a.n != null){ cnt[a.n] = (cnt[a.n] || 0) + 1; if (cnt[a.n] === 1) ev.push({t:a.t, d:[0x90, a.n, a.v === BASS ? 85 : 92], off:0}); }
+    cur[a.v] = a.n;
   }
   ev.sort((a, b) => a.t - b.t || b.off - a.off);
   const bytes = [];
@@ -898,7 +1127,7 @@ function fitCanvas(cv){
 }
 function draw(){
   requestAnimationFrame(draw);
-  try { drawLines(); drawPiano(); } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
+  try { if (focusOn) drawFocus(); else { drawLines(); drawPiano(); } } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
 }
 function drawLines(){
   const {g, w, h} = fitCanvas(els.scope);
@@ -1074,7 +1303,7 @@ function pianoHit(e){
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','latency','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','latency','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -1092,7 +1321,7 @@ NOTE_NAMES.forEach((n, i) => {
   padPress(b, () => rootDown(i, 'p'), () => rootUp(i, 'p'));
   els.roots.append(b); rootBtns.push(b);
 });
-CHORDS.forEach((c, i) => {
+CHORDS.slice(0, BASIC_TYPES).forEach((c, i) => {
   const b = document.createElement('button'); b.className = 'pad';
   b.textContent = c.label; const k = document.createElement('kbd'); k.textContent = US_LABELS[TYPE_CODES[i]]; b.append(k);
   padPress(b, () => typeDown(i));
@@ -1106,6 +1335,7 @@ function rootUp(i, src){
 }
 function typeDown(i){
   curType = i;
+  if (focusOn && lastWrite){ rewriteLast(null, i); if (sounding || held.size) playChord(curRoot, i, true); renderFocusTypes(); return; }
   if (curRoot != null && (sounding || held.size)) playChord(curRoot, i, true);
   else { typeBtns.forEach((b, j) => b.classList.toggle('sel', j === i)); updateHarmony(); }
 }
@@ -1141,7 +1371,7 @@ window.addEventListener('keydown', e => {
   if (t >= 0){ e.preventDefault(); typeBtns[t].classList.add('hit'); typeDown(t); }
 });
 const keyRoot = {};
-function replaceLastRec(r){ if (recording && steps.length){ steps[steps.length - 1].root = r; renderSteps(); save(); } }
+function replaceLastRec(r){ if (focusOn && lastWrite) { rewriteLast(r, null); return; } if (recording && steps.length){ steps[steps.length - 1].root = r; loopChanged(); } }
 window.addEventListener('keyup', e => {
   const key = e.key.toLowerCase();
   if (key === 'x') mod.sharp = false;
@@ -1178,7 +1408,7 @@ function syncUI(){
 }
 let applyTimer = 0, lastOctave = P.octave;
 function changed(key){
-  save();
+  save(); markLoopDirty();
   syncFront();
   // Oktave: bisherige Stimmlage mitverschieben, damit die neue Lage sofort gilt
   if (P.octave !== lastOctave){
@@ -1308,17 +1538,19 @@ els.latchBtn.addEventListener('click', () => { latch = !latch; els.latchBtn.clas
 els.stopBtn.addEventListener('click', stopAll);
 els.recBtn.addEventListener('click', () => { recording = !recording; els.recBtn.classList.toggle('on', recording); if (recording) toast('Aufnahme an: jeder Akkord wird angehängt.'); });
 els.pauseStepBtn.addEventListener('click', () => addStep({root:null, type:0, beats:+els.stepBeats.value}));
+els.loopBars.addEventListener('change', () => setBars(+els.loopBars.value));
 els.playBtn.addEventListener('click', () => looping ? stopLoop() : startLoop());
 els.loopResetBtn.addEventListener('click', () => {
   if (!confirm('Loop leeren und Tempo, Akkordlänge, Export und Generator auf Standard setzen?')) return;
   if (looping) stopLoop();
-  steps = []; selStep = -1; undoSteps = null; els.undoBtn.disabled = true;
+  pushUndo(); steps = []; selStep = -1; barsPref = 4;
   P.bpm = DEFAULTS.bpm; els.bpm.value = P.bpm; els.stepBeats.value = '4'; els.passes.value = '2';
   els.genDur.value = '30'; els.genStyle.selectedIndex = 0; els.genKey.value = 'cur';
   if (recording) els.recBtn.click();
   renderSteps(); changed(); toast('Loop zurückgesetzt.');
 });
-els.clearBtn.addEventListener('click', () => { if (!steps.length || confirm('Loop wirklich leeren?')) { if (looping) stopLoop(); steps = []; renderSteps(); save(); } });
+function clearLoop(){ lastWrite = null; if (!steps.length) return; if (looping) stopLoop(); pushUndo(); steps = []; selStep = -1; loopSeed = Math.floor(Math.random() * 1e6); loopChanged(); toast('Loop geleert (Rückgängig möglich).'); }
+els.clearBtn.addEventListener('click', clearLoop);
 els.wavBtn.addEventListener('click', () => exportWav().catch(e => toast('WAV-Export fehlgeschlagen: ' + e.message)));
 els.midiBtn.addEventListener('click', exportMidi);
 function showTab(name){
@@ -1334,27 +1566,199 @@ KEYS.forEach((k, i) => { const o = document.createElement('option'); o.value = i
 els.keySel.addEventListener('change', () => { keyFixed = els.keySel.value === 'auto' ? null : KEYS[+els.keySel.value]; updateHarmony(); });
 // Generator
 Object.keys(STYLES).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.genStyle.append(o); });
-let undoSteps = null;
-els.genBtn.addEventListener('click', () => {
+function runGenerator(seconds, exactBeats){
   const key = els.genKey.value === 'rnd' ? KEYS[Math.floor(Math.random() * 12) + (Math.random() < 0.5 ? 0 : 12)] : currentKey();
-  const g = generate(+els.genDur.value, els.genStyle.value, key);
-  undoSteps = steps.map(x => ({...x})); els.undoBtn.disabled = false;
+  const g = generate(seconds, els.genStyle.value, key, exactBeats);
+  pushUndo(); loopSeed = Math.floor(Math.random() * 1e6);
   if (looping) stopLoop();
   if (engine) engine.gateOff(ctx.currentTime + 0.005);
-  steps = g.steps; selStep = -1; renderSteps(); save();
+  steps = g.steps; selStep = -1; loopChanged();
   chordHist = []; leader.prev = null;
   if (els.keySel.value !== 'auto'){ keyFixed = g.key; els.keySel.value = KEYS.findIndex(k => k.root === g.key.root && k.mode === g.key.mode); }
   const secs = Math.round(steps.reduce((a, x) => a + x.beats, 0) * 60 / P.bpm);
   toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
   setTimeout(startLoop, 120);
-});
-els.undoBtn.addEventListener('click', () => {
-  if (!undoSteps) return;
-  if (looping) stopLoop();
-  steps = undoSteps; undoSteps = null; els.undoBtn.disabled = true; selStep = -1; renderSteps(); save();
-});
+}
+els.genBtn.addEventListener('click', () => runGenerator(+els.genDur.value));
+els.undoBtn.addEventListener('click', undo);
 
-syncUI(); renderSteps(); updateHarmony();
+/* ---------- Fokus-Modus ---------- */
+var focusOn = false, lastWrite = null, focusCursor = 0, focusArm = 0;
+['fBars','fGraph','fChord','fStatus','fRoots','fTypes','fBarsSel','fLen','fBpm','fBpmDown','fBpmUp','fUndo','fRedo','fClear','fGen','fSound','fPlay','fExit','fKey']
+  .forEach(id => els[id] = document.getElementById(id));
+const F_LETTERS = [['C',0],['D',2],['E',4],['F',5],['G',7],['A',9],['B',11]];
+function focusGrid(){
+  const g = toGrid(steps), n = barCount() * 4;
+  while (g.length < n) g.push(null);
+  return g;
+}
+function writeFocus(root, type){
+  const len = +els.fLen.value, g = focusGrid();
+  if (focusCursor >= g.length) focusCursor = 0;
+  pushUndo();
+  for (let i = focusCursor; i < Math.min(g.length, focusCursor + len); i++) g[i] = {root, type};
+  lastWrite = {pos:focusCursor, len, time:performance.now()};
+  focusCursor = (focusCursor + len) % g.length;
+  steps = fromGrid(g); loopChanged();
+}
+function rewriteLast(root, type){
+  if (!lastWrite) return;
+  const g = focusGrid(); pushUndo();
+  for (let i = lastWrite.pos; i < Math.min(g.length, lastWrite.pos + lastWrite.len); i++){
+    const c = g[i] || {root: curRoot ?? 0, type: curType};
+    g[i] = {root: root ?? c.root, type: type ?? c.type};
+  }
+  lastWrite.time = performance.now();
+  steps = fromGrid(g); loopChanged();
+}
+function renderFocus(){
+  if (!focusOn) return;
+  const g = focusGrid(), nb = g.length / 4, curBar = Math.floor(focusCursor / 4);
+  els.fBars.innerHTML = '';
+  for (let b = 0; b < nb; b++){
+    const cell = document.createElement('button'); cell.className = 'fbar' + (b === curBar ? ' cur' : ''); cell.dataset.b = b;
+    const no = document.createElement('span'); no.className = 'no'; no.textContent = b + 1; cell.append(no);
+    const h1 = g[b * 4], h2 = g[b * 4 + 2];
+    const nm = c => c ? chordName(c.root, c.type) : '–';
+    const same = (x, y) => (!x && !y) || (x && y && x.root === y.root && x.type === y.type);
+    const parts = same(h1, h2) ? [h1] : [h1, h2];
+    parts.forEach(c => { const sp = document.createElement('span'); sp.className = 'half' + (c ? '' : ' empty2'); sp.textContent = nm(c); cell.append(sp); });
+    const pr = document.createElement('i'); pr.className = 'prog'; cell.append(pr);
+    cell.addEventListener('click', e => {
+      const r = cell.getBoundingClientRect();
+      focusCursor = b * 4 + (+els.fLen.value === 2 && e.clientX - r.left > r.width / 2 ? 2 : 0);
+      lastWrite = null; renderFocus();
+    });
+    els.fBars.append(cell);
+  }
+  syncBarsSelect(els.fBarsSel);
+  els.fBpm.textContent = P.bpm + ' BPM';
+  const k = currentKey(); els.fKey.textContent = keyName(k);
+  updateFocusStatus();
+  renderFocusRoots(); renderFocusTypes();
+}
+function updateFocusStatus(){
+  const nb = barCount();
+  if (looping && playingStep >= 0){
+    const pos = ((loopPos() % (nb * 4)) + nb * 4) % (nb * 4);
+    els.fStatus.textContent = `Spielt Takt ${Math.floor(pos / 4) + 1} von ${nb}` + (curRoot != null ? '' : '');
+  } else {
+    els.fStatus.innerHTML = '';
+    els.fStatus.append(`Takt ${Math.floor(focusCursor / 4) + 1}${focusCursor % 4 ? ' (2. Hälfte)' : ''} ausgewählt`);
+    els.fStatus.append(document.createElement('br'), 'Buchstabe setzt den Akkord, Typ/♭/♯ ändern ihn danach.');
+  }
+}
+function renderFocusRoots(){
+  els.fRoots.innerHTML = '';
+  const mk = (txt, cls, fn) => { const b = document.createElement('button'); b.textContent = txt; if (cls) b.className = cls; b.addEventListener('pointerdown', e => { e.preventDefault(); fn(); }); els.fRoots.append(b); return b; };
+  // ♭/♯ verändert den zuletzt gesetzten Akkord (wie X/Z direkt nach dem Buchstaben);
+  // ist noch keiner gesetzt, gilt es für den nächsten Buchstaben
+  const acc = (d) => {
+    if (lastWrite && curRoot != null){ const r = (curRoot + d + 12) % 12; playChord(r, curType, true); rewriteLast(r, null); }
+    else { focusArm = focusArm === d ? 0 : d; renderFocusRoots(); }
+  };
+  mk('♭', 'acc' + (focusArm === -1 ? ' armed' : ''), () => acc(-1));
+  F_LETTERS.forEach(([l, pc]) => {
+    const isSel = curRoot != null && noteDisp(curRoot)[0] === l;
+    const b = mk(l, isSel ? 'sel' : '', () => { const r = (pc + focusArm + 12) % 12; focusArm = 0; playChord(r, curType); });
+    b.addEventListener('pointerup', () => { if (!latch && !looping) release(); });
+  });
+  mk('♯', 'acc' + (focusArm === 1 ? ' armed' : ''), () => acc(1));
+}
+function renderFocusTypes(){
+  if (!focusOn) return;
+  els.fTypes.innerHTML = '';
+  CHORDS.forEach((c, i) => {
+    const b = document.createElement('button'); b.textContent = c.label === 'Dur' ? 'maj' : c.label === 'Moll' ? 'm' : c.label;
+    if (i === curType) b.className = 'sel';
+    b.addEventListener('pointerdown', e => { e.preventDefault(); typeDown(i); renderFocusTypes(); });
+    els.fTypes.append(b);
+  });
+}
+function setFocus(on){
+  focusOn = on; document.body.classList.toggle('focus', on);
+  if (on){ if (!steps.length) focusCursor = 0; lastWrite = null; renderFocus(); }
+  else renderSteps();
+}
+// Loop-Anzeige im Fokus: feste Zeitachse über den ganzen Loop, Abspielposition wandert
+function drawFocus(){
+  const {g, w, h} = fitCanvas(els.fGraph);
+  g.clearRect(0, 0, w, h);
+  const lv = ensureEvents(), beats = Math.max(4, barCount() * 4), spb = 60 / P.bpm;
+  const X = b => 6 + (b / beats) * (w - 12);
+  // Takte und Akkordnamen
+  g.font = '600 11px system-ui'; g.textBaseline = 'top';
+  for (let b = 0; b <= beats; b += 4){ g.fillStyle = b % (beats) === 0 ? 'rgba(236,233,247,.18)' : 'rgba(236,233,247,.10)'; g.fillRect(Math.round(X(b)), 0, 1, h); }
+  let acc = 0;
+  steps.forEach((st, k) => {
+    if (st.root != null){ g.fillStyle = k === playingStep && looping ? '#7cf0d0' : 'rgba(236,233,247,.6)'; g.fillText(chordName(st.root, st.type), X(acc) + 4, 5); }
+    acc += st.beats;
+  });
+  if (!lv.events.length) return;
+  // Zeitverlauf je Stimme aus den Ereignissen
+  const n = P.voices, lanes = Array.from({length:n + 1}, () => []);
+  for (const e of lv.events){
+    if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
+    if (e.kind === 'move'){ if (e.i < n) lanes[e.i].push({t:e.b, to:e.note, g:e.glide / spb}); continue; }
+    for (let j = 0; j < n; j++){ const jj = Math.min(j, e.notes.length - 1); lanes[j].push({t:e.b + e.offs[jj], to:e.notes[jj], g:e.glides[jj] / spb}); }
+    lanes[n].push({t:e.b, to:e.bass, g:P.glide / spb});
+  }
+  lanes.forEach(l => l.sort((a, b) => a.t - b.t));
+  const at = (l, b) => {
+    let i = -1; for (let k = 0; k < l.length; k++) if (l[k].t <= b) i = k;
+    const c = i >= 0 ? l[i] : l[l.length - 1], prev = i > 0 ? l[i - 1] : l[l.length - 1];
+    if (!c || c.off) return null;
+    const since = i >= 0 ? b - c.t : b + lv.beats - c.t;
+    if (prev && !prev.off && since < c.g) return prev.to + (c.to - prev.to) * (since / c.g);
+    return c.to;
+  };
+  let lo = Infinity, hi = -Infinity;
+  lanes.forEach((l, j) => { if (j === n && !P.bass) return; l.forEach(c => { if (!c.off){ lo = Math.min(lo, c.to); hi = Math.max(hi, c.to); } }); });
+  if (hi - lo < 12){ const c = (lo + hi) / 2; lo = c - 6; hi = c + 6; }
+  const top = 24, bot = h - 8, Y = m => bot - (m - lo + 1) / (hi - lo + 2) * (bot - top);
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  lanes.forEach((l, j) => {
+    if (j === n && !P.bass) return;
+    const col = j === n ? BASS_COLOR : VOICE_COLORS[j];
+    g.beginPath(); let open = false;
+    for (let px = 0; px <= w - 12; px += 2){
+      const b = px / (w - 12) * lv.beats, m = at(l, b);
+      if (m == null){ open = false; continue; }
+      const x = X(b), y = Y(m); open ? g.lineTo(x, y) : g.moveTo(x, y); open = true;
+    }
+    g.strokeStyle = col; g.globalAlpha = j === n ? 0.12 : 0.18; g.lineWidth = j === n ? 6 : 8; g.stroke();
+    g.globalAlpha = j === n ? 0.6 : 1; g.lineWidth = j === n ? 2 : 2.5; g.stroke(); g.globalAlpha = 1;
+  });
+  // Abspielposition
+  if (looping){
+    const pos = ((loopPos() % lv.beats) + lv.beats) % lv.beats, x = X(pos);
+    g.fillStyle = 'rgba(236,233,247,.7)'; g.fillRect(Math.round(x), 18, 1.5, h - 18);
+    lanes.forEach((l, j) => { if (j === n && !P.bass) return; const m = at(l, pos); if (m == null) return;
+      g.fillStyle = j === n ? BASS_COLOR : VOICE_COLORS[j]; g.beginPath(); g.arc(x, Y(m), j === n ? 3.5 : 5, 0, Math.PI * 2); g.fill(); });
+    // Fortschritt im aktuellen Takt
+    const bar = Math.floor(pos / 4);
+    els.fBars.querySelectorAll('.fbar').forEach((c, i) => {
+      c.classList.toggle('play', i === bar);
+      c.querySelector('.prog').style.width = i === bar ? ((pos - bar * 4) / 4 * 100) + '%' : '0';
+    });
+    updateFocusStatus();
+  }
+}
+els.focusBtn.addEventListener('click', () => setFocus(true));
+els.fExit.addEventListener('click', () => setFocus(false));
+els.fPlay.addEventListener('click', () => looping ? stopLoop() : startLoop());
+els.fUndo.addEventListener('click', undo);
+els.fRedo.addEventListener('click', redo);
+els.fClear.addEventListener('click', () => { clearLoop(); focusCursor = 0; renderFocus(); });
+els.fBarsSel.addEventListener('change', () => { setBars(+els.fBarsSel.value); if (focusCursor >= barCount() * 4) focusCursor = 0; renderFocus(); });
+els.fLen.addEventListener('change', () => { focusCursor -= focusCursor % +els.fLen.value; renderFocus(); });
+const bpmBy = d => { P.bpm = Math.max(40, Math.min(240, P.bpm + d)); els.bpm.value = P.bpm; changed(); renderFocus(); };
+els.fBpmDown.addEventListener('click', () => bpmBy(-2));
+els.fBpmUp.addEventListener('click', () => bpmBy(2));
+els.fGen.addEventListener('click', () => { runGenerator(0, barCount() * 4); focusCursor = 0; lastWrite = null; });
+els.fSound.addEventListener('click', () => { setFocus(false); showTab('sound'); });
+
+syncUI(); renderSteps(); updateHarmony(); updUndo();
 requestAnimationFrame(draw);
 
 // Installieren: eigener Button (Chrome, Brave, Edge, Samsung) bzw. Anleitung (iPhone)
