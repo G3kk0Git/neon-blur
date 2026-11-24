@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chordwave</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#0b0a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  --bg:#0b0a12; --panel:#15131f; --panel2:#1d1a2b; --line:#2c2840;
+  --text:#ece9f7; --dim:#9a94b5; --accent:#7cf0d0; --accent2:#b18cff; --warn:#ff7a90;
+  --radius:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:max(12px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));max-width:980px;margin:0 auto;user-select:none;-webkit-user-select:none}
+header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+header h1{font-size:20px;margin:0;letter-spacing:.04em;font-weight:700}
+header h1 span{color:var(--accent)}
+header .sp{flex:1}
+button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.97)}
+button.on{background:var(--accent);color:#0b0a12;border-color:var(--accent);font-weight:600}
+button.rec.on{background:var(--warn);border-color:var(--warn)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;margin-bottom:12px}
+.display{display:flex;flex-direction:column;gap:8px}
+.chordname{font-size:44px;font-weight:700;letter-spacing:.02em;min-height:54px;text-align:center}
+.chordname small{font-size:16px;color:var(--dim);font-weight:400;display:block}
+canvas#kb{width:100%;height:80px;display:block;border-radius:8px}
+.pads{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:760px){.pads{grid-template-columns:1.1fr 1fr}}
+.label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px}
+.roots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.types{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.pad{position:relative;height:56px;font-size:18px;font-weight:600;border-radius:10px;touch-action:none}
+.pad.sharp{background:#100e19}
+.pad.sel{outline:2px solid var(--accent2);outline-offset:-2px}
+.pad.hit{background:var(--accent);color:#0b0a12}
+.pad kbd{position:absolute;right:6px;bottom:4px;font:10px ui-monospace,monospace;color:var(--dim)}
+.pad.hit kbd{color:#0b0a12}
+.types .pad{font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row label{color:var(--dim);font-size:13px}
+select,input[type=number]{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+input[type=number]{width:72px}
+.steps{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;min-height:84px}
+.step{flex:0 0 auto;min-width:86px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+.step.now{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.step .n{font-weight:700;font-size:17px}
+.step .ctl{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--dim)}
+.step .ctl button{padding:2px 7px;font-size:13px;border-radius:6px}
+.empty{color:var(--dim);font-size:13px;padding:10px 0}
+details.card>summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details.card>summary::after{content:"▾";color:var(--dim)}
+details.card[open]>summary::after{content:"▴"}
+.knobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px 14px;margin-top:12px}
+.knob{display:flex;flex-direction:column;gap:2px}
+.knob .t{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+.knob .t b{color:var(--text);font-weight:500}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.group{font-size:12px;color:var(--accent2);text-transform:uppercase;letter-spacing:.08em;grid-column:1/-1;margin-top:6px}
+.hint{color:var(--dim);font-size:12px;margin-top:8px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>Chord<span>wave</span></h1>
+  <div class="sp"></div>
+  <button id="latchBtn" class="on" title="Akkord klingt weiter, bis du einen neuen spielst">Halten</button>
+  <button id="stopBtn" title="Leertaste">Stopp</button>
+</header>
+
+<div class="card display">
+  <div class="chordname" id="chordName">–<small>Tippe einen Grundton</small></div>
+  <canvas id="kb"></canvas>
+</div>
+
+<div class="pads">
+  <div class="card">
+    <p class="label">Grundton</p>
+    <div class="roots" id="roots"></div>
+  </div>
+  <div class="card">
+    <p class="label">Akkordtyp</p>
+    <div class="types" id="types"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <p class="label" style="margin:0;flex:1">Loop</p>
+    <button id="recBtn" class="rec" title="Jeder gespielte Akkord wird an den Loop angehängt">● Aufnahme</button>
+    <button id="pauseStepBtn" title="Pause an den Loop anhängen">+ Pause</button>
+    <button id="playBtn">▶ Abspielen</button>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="row">
+    <label>Tempo <input type="number" id="bpm" min="40" max="240" value="90"> BPM</label>
+    <label>Neue Akkorde <select id="stepBeats">
+      <option value="1">1 Schlag</option><option value="2">2 Schläge</option>
+      <option value="4" selected>1 Takt</option><option value="8">2 Takte</option></select></label>
+    <span class="sp" style="flex:1"></span>
+    <button id="clearBtn">Leeren</button>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <label>Export-Durchläufe <select id="passes"><option>1</option><option selected>2</option><option>4</option></select></label>
+    <button id="wavBtn">⬇ WAV</button>
+    <button id="midiBtn">⬇ MIDI</button>
+  </div>
+</div>
+
+<details class="card" id="soundCard" open>
+  <summary>Sound</summary>
+  <div class="row" style="margin-top:12px">
+    <label>Preset <select id="preset"></select></label>
+    <label>Welle <select id="wave">
+      <option value="sawtooth">Säge</option><option value="square">Rechteck</option>
+      <option value="triangle">Dreieck</option><option value="sine">Sinus</option></select></label>
+    <label><input type="checkbox" id="bass"> Bass</label>
+    <label><input type="checkbox" id="retrig"> Neu anschlagen</label>
+  </div>
+  <div class="knobs" id="knobs"></div>
+  <p class="hint">PC: Grundton mit <b>A W S E D F T G Z/Y H U J</b> (wie Klaviertasten), Akkordtyp mit <b>1–0 ß ´</b> bzw. <b>1–0 - =</b>, Stopp mit Leertaste.</p>
+</details>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ---------- Musik-Daten ---------- */
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const CHORDS = [
+  {id:'',     label:'Dur',   iv:[0,4,7]},
+  {id:'m',    label:'Moll',  iv:[0,3,7]},
+  {id:'7',    label:'7',     iv:[0,4,7,10]},
+  {id:'maj7', label:'maj7',  iv:[0,4,7,11]},
+  {id:'m7',   label:'m7',    iv:[0,3,7,10]},
+  {id:'sus2', label:'sus2',  iv:[0,2,7]},
+  {id:'sus4', label:'sus4',  iv:[0,5,7]},
+  {id:'add9', label:'add9',  iv:[0,4,7,14]},
+  {id:'m9',   label:'m9',    iv:[0,3,7,10,14]},
+  {id:'maj9', label:'maj9',  iv:[0,4,7,11,14]},
+  {id:'dim',  label:'dim',   iv:[0,3,6]},
+  {id:'aug',  label:'aug',   iv:[0,4,8]},
+];
+const ROOT_CODES = ['KeyA','KeyW','KeyS','KeyE','KeyD','KeyF','KeyT','KeyG','KeyY','KeyH','KeyU','KeyJ'];
+const TYPE_CODES = ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal'];
+const US_LABELS = {KeyA:'A',KeyW:'W',KeyS:'S',KeyE:'E',KeyD:'D',KeyF:'F',KeyT:'T',KeyG:'G',KeyY:'Y',KeyH:'H',KeyU:'U',KeyJ:'J',
+  Digit1:'1',Digit2:'2',Digit3:'3',Digit4:'4',Digit5:'5',Digit6:'6',Digit7:'7',Digit8:'8',Digit9:'9',Digit0:'0',Minus:'-',Equal:'='};
+
+const chordName = (root, t) => NOTE_NAMES[root] + CHORDS[t].id;
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const ftom = f => 69 + 12 * Math.log2(f / 440);
+
+/* ---------- Stimmführung: jede Stimme gleitet zum nächstgelegenen Akkordton ---------- */
+function targetPcs(root, type, n){
+  let iv = CHORDS[type].iv.map(x => x % 12);
+  // zu viele Töne: erst Quinte, dann Grundton weglassen
+  while (iv.length > n){
+    const i5 = iv.indexOf(7);
+    if (i5 > 0 && iv.length > 3) iv.splice(i5, 1);
+    else if (iv[0] === 0 && iv.length > 2) iv.shift();
+    else iv.pop();
+  }
+  const base = iv.slice();
+  const dbl = [0, 7, base[1]].filter(x => base.includes(x));
+  let k = 0;
+  while (iv.length < n){ iv.push(dbl[k % dbl.length]); k++; }
+  return iv.map(x => (x + root) % 12).sort((a, b) => a - b);
+}
+function voiceChord(root, type, prev, n, center){
+  const pcs = targetPcs(root, type, n);
+  let best = null, bestCost = Infinity;
+  for (let r = 0; r < n; r++){
+    const seq = pcs.slice(r).concat(pcs.slice(0, r));
+    for (let o = 2; o <= 6; o++){
+      const notes = [seq[0] + 12 * o];
+      for (let i = 1; i < n; i++){
+        let x = seq[i] + 12 * Math.floor(notes[i-1] / 12);
+        while (x <= notes[i-1]) x += 12;
+        notes.push(x);
+      }
+      const mean = notes.reduce((a, b) => a + b, 0) / n;
+      let cost = Math.abs(mean - center) * (prev ? 0.6 : 3);
+      if (prev && prev.length === n) for (let i = 0; i < n; i++) cost += Math.abs(notes[i] - prev[i]);
+      if (cost < bestCost){ bestCost = cost; best = notes; }
+    }
+  }
+  return best;
+}
+function bassNote(root, center){
+  let b = root + 12 * Math.floor((center - 24) / 12);
+  if (b < center - 30) b += 12;
+  return b;
+}
+// Mit Vorgänger: jede Stimme sucht sich einen nahen Akkordton (max. 7 Halbtöne), alle Akkordtöne müssen vorkommen.
+function leadVoices(root, type, prev, center){
+  const n = prev.length;
+  const need = [...new Set(targetPcs(root, type, n))];
+  const pcSet = new Set(CHORDS[type].iv.map(x => (x + root) % 12));
+  const cands = prev.map(p => { const c = []; for (let x = p - 7; x <= p + 7; x++) if (pcSet.has(((x % 12) + 12) % 12)) c.push(x); return c; });
+  let best = null, bestCost = Infinity;
+  const cur = [];
+  (function dfs(i, cost){
+    if (cost >= bestCost) return;
+    if (i === n){
+      const pcs = new Set(cur.map(x => x % 12));
+      if (!need.every(q => pcs.has(q))) return;
+      const mean = cur.reduce((a, b) => a + b, 0) / n;
+      const c = cost + Math.max(0, Math.abs(mean - center) - 3) * 1.2;
+      if (c < bestCost){ bestCost = c; best = cur.slice(); }
+      return;
+    }
+    for (const x of cands[i]){
+      if (i && x <= cur[i-1]) continue;
+      cur.push(x); dfs(i + 1, cost + Math.abs(x - prev[i])); cur.pop();
+    }
+  })(0, 0);
+  return best;
+}
+class VoiceLeader{
+  constructor(){ this.prev = null; }
+  next(root, type, p){
+    const center = 62 + 12 * p.octave;
+    const notes = (this.prev && this.prev.length === p.voices && leadVoices(root, type, this.prev, center))
+      || voiceChord(root, type, null, p.voices, center);
+    this.prev = notes;
+    return {notes, bass: bassNote(root, center)};
+  }
+}
+
+/* ---------- Klangerzeugung ---------- */
+const MAX_VOICES = 6;
+function makeImpulse(ctx, seconds){
+  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++){
+    const d = buf.getChannelData(c);
+    let lp = 0;
+    for (let i = 0; i < len; i++){
+      const t = i / len;
+      lp += 0.35 * ((Math.random() * 2 - 1) - lp);
+      d[i] = lp * Math.pow(1 - t, 3.2) * (i < 64 ? i / 64 : 1);
+    }
+  }
+  return buf;
+}
+function ramp(param, t){
+  if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+  else { param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); }
+}
+class Engine{
+  constructor(ctx, p){
+    this.ctx = ctx; this.p = p;
+    this.gate = false;
+    const out = ctx.createDynamicsCompressor();
+    out.threshold.value = -10; out.ratio.value = 4;
+    out.connect(ctx.destination);
+    this.master = ctx.createGain(); this.master.connect(out);
+    this.amp = ctx.createGain(); this.amp.gain.value = 0;
+    this.filter = ctx.createBiquadFilter(); this.filter.type = 'lowpass';
+    this.bus = ctx.createGain();
+    this.bus.connect(this.filter); this.filter.connect(this.amp);
+    this.dry = ctx.createGain(); this.amp.connect(this.dry); this.dry.connect(this.master);
+    this.verb = ctx.createConvolver(); this.verbWet = ctx.createGain();
+    this.amp.connect(this.verb); this.verb.connect(this.verbWet); this.verbWet.connect(this.master);
+    this.delay = ctx.createDelay(2); this.fb = ctx.createGain(); this.delWet = ctx.createGain();
+    this.amp.connect(this.delay); this.delay.connect(this.fb); this.fb.connect(this.delay);
+    this.delay.connect(this.delWet); this.delWet.connect(this.master); this.delWet.connect(this.verb);
+    this.lfo = ctx.createOscillator(); this.lfoGain = ctx.createGain();
+    this.lfo.connect(this.lfoGain); this.lfoGain.connect(this.filter.detune); this.lfo.start();
+    this.voices = [];
+    for (let i = 0; i < MAX_VOICES + 1; i++){
+      const g = ctx.createGain(); g.gain.value = 0; g.connect(this.bus);
+      const a = ctx.createOscillator(), b = ctx.createOscillator();
+      a.connect(g); b.connect(g); a.start(); b.start();
+      this.voices.push({a, b, g, from:220, to:220, t0:0, t1:0});
+    }
+    this.verbSize = -1;
+    this.apply(p);
+  }
+  apply(p){
+    this.p = p;
+    const t = this.ctx.currentTime;
+    this.filter.frequency.setTargetAtTime(p.cutoff, t, 0.02);
+    this.filter.Q.setTargetAtTime(p.res, t, 0.02);
+    this.lfo.frequency.setTargetAtTime(p.lfoRate, t, 0.02);
+    this.lfoGain.gain.setTargetAtTime(p.lfoDepth * 2400, t, 0.02);
+    this.verbWet.gain.setTargetAtTime(p.verbMix * 1.4, t, 0.02);
+    this.dry.gain.setTargetAtTime(1 - p.verbMix * 0.5, t, 0.02);
+    this.delay.delayTime.setTargetAtTime(Math.min(2, p.delBeats * 60 / p.bpm), t, 0.05);
+    this.fb.gain.setTargetAtTime(p.delFb, t, 0.02);
+    this.delWet.gain.setTargetAtTime(p.delMix, t, 0.02);
+    this.master.gain.setTargetAtTime(p.volume, t, 0.02);
+    if (Math.abs(this.verbSize - p.verbSize) > 0.01){ this.verbSize = p.verbSize; this.verb.buffer = makeImpulse(this.ctx, p.verbSize); }
+    const per = 0.5 / Math.sqrt(p.voices);
+    this.voices.forEach((v, i) => {
+      v.a.type = v.b.type = p.wave;
+      v.a.detune.setTargetAtTime(-p.detune, t, 0.02);
+      v.b.detune.setTargetAtTime(p.detune, t, 0.02);
+      const isBass = i === MAX_VOICES;
+      const level = isBass ? (p.bass ? p.bassLevel * 0.55 : 0) : (i < p.voices ? per : 0);
+      v.g.gain.setTargetAtTime(level, t, 0.03);
+    });
+  }
+  freqAt(v, t){
+    if (t >= v.t1) return v.to;
+    if (t <= v.t0) return v.from;
+    return v.from * Math.pow(v.to / v.from, (t - v.t0) / (v.t1 - v.t0));
+  }
+  glideVoice(v, f, t, glide){
+    const cur = this.freqAt(v, t);
+    for (const o of [v.a, v.b]){
+      ramp(o.frequency, t);
+      o.frequency.setValueAtTime(cur, t);
+      if (glide > 0.005) o.frequency.exponentialRampToValueAtTime(f, t + glide);
+      else o.frequency.setValueAtTime(f, t);
+    }
+    v.from = cur; v.to = f; v.t0 = t; v.t1 = t + Math.max(glide, 0.0001);
+  }
+  play(voiced, t){
+    const p = this.p;
+    const glide = this.gate ? p.glide : 0;
+    const all = voiced.notes.slice();
+    for (let i = 0; i < MAX_VOICES; i++){
+      const n = all[Math.min(i, all.length - 1)];
+      this.glideVoice(this.voices[i], mtof(n), t, glide);
+    }
+    this.glideVoice(this.voices[MAX_VOICES], mtof(voiced.bass), t, glide);
+    if (!this.gate || p.retrig) this.gateOn(t);
+  }
+  gateOn(t){
+    const p = this.p, g = this.amp.gain;
+    ramp(g, t);
+    g.linearRampToValueAtTime(1, t + Math.max(0.003, p.attack));
+    g.setTargetAtTime(p.sustain, t + Math.max(0.003, p.attack), Math.max(0.01, p.decay / 3));
+    this.gate = true;
+  }
+  gateOff(t){
+    const g = this.amp.gain;
+    ramp(g, t);
+    g.setTargetAtTime(0, t, Math.max(0.01, this.p.release / 4));
+    this.gate = false;
+  }
+}
+
+/* ---------- Parameter, Presets ---------- */
+const DEFAULTS = {wave:'sawtooth', detune:10, voices:4, octave:0, glide:0.35, attack:0.08, decay:0.6, sustain:0.8, release:1.2,
+  retrig:false, cutoff:1800, res:3, lfoRate:0.25, lfoDepth:0.15, verbMix:0.35, verbSize:3, delMix:0.12, delFb:0.35, delBeats:0.75,
+  bass:true, bassLevel:0.6, volume:0.7, bpm:90};
+const PRESETS = {
+  'Weiches Pad': {},
+  'Glas-Keys': {wave:'triangle', detune:4, glide:0.15, attack:0.005, decay:0.9, sustain:0.35, release:1.4, retrig:true, cutoff:5000, res:1, lfoDepth:0, verbMix:0.3, delMix:0.18},
+  'Analog-Strings': {wave:'sawtooth', detune:18, voices:5, glide:0.5, attack:0.6, decay:1, sustain:0.9, release:2, cutoff:2600, res:1.5, lfoRate:0.15, lfoDepth:0.1, verbMix:0.45, verbSize:4},
+  'Orgel': {wave:'square', detune:3, glide:0.08, attack:0.01, decay:0.2, sustain:1, release:0.15, cutoff:3200, res:0.8, lfoRate:5.5, lfoDepth:0.04, verbMix:0.2, delMix:0},
+  'Dunkler Drone': {wave:'sawtooth', detune:22, voices:6, octave:-1, glide:1.2, attack:1.5, sustain:1, release:3, cutoff:700, res:6, lfoRate:0.08, lfoDepth:0.45, verbMix:0.6, verbSize:5, delMix:0.2, delFb:0.5},
+  'Pluck': {wave:'sawtooth', detune:6, glide:0.05, attack:0.002, decay:0.35, sustain:0, release:0.4, retrig:true, cutoff:2400, res:4, lfoDepth:0, verbMix:0.3, delMix:0.25, delBeats:0.5},
+};
+const KNOBS = [
+  ['Stimmen'],
+  ['voices','Stimmen',3,6,1, v=>v],
+  ['octave','Lage',-2,2,1, v=>(v>0?'+':'')+v+' Okt'],
+  ['glide','Gleitzeit',0,3,0.01, v=>v.toFixed(2)+' s'],
+  ['detune','Verstimmung',0,40,1, v=>v+' ct'],
+  ['bassLevel','Bass',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['Hüllkurve'],
+  ['attack','Anschwellen',0,3,0.005, v=>v.toFixed(2)+' s'],
+  ['decay','Abfall',0.02,3,0.01, v=>v.toFixed(2)+' s'],
+  ['sustain','Halten',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['release','Ausklang',0.02,5,0.01, v=>v.toFixed(2)+' s'],
+  ['Filter'],
+  ['cutoff','Filter',80,12000,0, v=>v>=1000?(v/1000).toFixed(1)+' kHz':Math.round(v)+' Hz', true],
+  ['res','Resonanz',0.1,15,0.1, v=>v.toFixed(1)],
+  ['lfoRate','LFO Tempo',0.02,8,0.01, v=>v.toFixed(2)+' Hz'],
+  ['lfoDepth','LFO Tiefe',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['Effekte'],
+  ['verbMix','Hall',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['verbSize','Raumgröße',0.5,8,0.1, v=>v.toFixed(1)+' s'],
+  ['delMix','Echo',0,0.8,0.01, v=>Math.round(v*100)+'%'],
+  ['delFb','Echo-Rückkopplung',0,0.9,0.01, v=>Math.round(v*100)+'%'],
+  ['delBeats','Echo-Zeit',0.25,2,0.25, v=>({0.25:'1/16',0.5:'1/8',0.75:'1/8 punkt.',1:'1/4',1.5:'1/4 punkt.',2:'1/2'}[v]||v+' Schl.')],
+  ['volume','Lautstärke',0,1,0.01, v=>Math.round(v*100)+'%'],
+];
+
+/* ---------- Speicher ---------- */
+const STORE = 'chordwave.v1';
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch(e){}
+const P = Object.assign({}, DEFAULTS, saved.p || {});
+let steps = Array.isArray(saved.steps) ? saved.steps : [];
+let latch = saved.latch !== false;
+let saveTimer = 0;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 300);
+}
+function saveNow(){
+  try { localStorage.setItem(STORE, JSON.stringify({p:P, steps, latch, preset: els.preset ? els.preset.value : undefined})); } catch(e){}
+}
+
+/* ---------- Audio-Kontext ---------- */
+let ctx = null, engine = null;
+const leader = new VoiceLeader();
+function ensureAudio(){
+  if (!ctx){
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
+    ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+    engine = new Engine(ctx, P);
+  }
+  if (ctx.state !== 'running') ctx.resume();
+}
+
+/* ---------- Spielen ---------- */
+let curRoot = null, curType = 0, sounding = false;
+const held = new Set();
+function playChord(root, type, noRecord, when){
+  ensureAudio();
+  curRoot = root; curType = type;
+  const v = leader.next(root, type, P);
+  engine.play(v, when || ctx.currentTime + 0.005);
+  sounding = true;
+  showChord(root, type, v.notes);
+  if (!noRecord && recording) addStep({root, type, beats:+els.stepBeats.value});
+}
+function release(){
+  if (!engine) return;
+  engine.gateOff(ctx.currentTime + 0.005);
+  sounding = false;
+}
+function showChord(root, type, notes){
+  els.chordName.innerHTML = '';
+  els.chordName.append(chordName(root, type));
+  const s = document.createElement('small');
+  s.textContent = notes.map(n => NOTE_NAMES[n % 12] + (Math.floor(n / 12) - 1)).join(' · ');
+  els.chordName.append(s);
+  document.querySelectorAll('.roots .pad').forEach((b, i) => b.classList.toggle('sel', i === root));
+  document.querySelectorAll('.types .pad').forEach((b, i) => b.classList.toggle('sel', i === type));
+}
+function stopAll(){
+  if (looping) stopLoop();
+  release();
+  held.clear();
+  document.querySelectorAll('.pad.hit').forEach(b => b.classList.remove('hit'));
+}
+
+/* ---------- Loop ---------- */
+let recording = false, looping = false, loopIdx = 0, nextTime = 0, loopTimer = 0;
+function addStep(s){ steps.push(s); renderSteps(); save(); }
+function renderSteps(){
+  const box = els.steps; box.innerHTML = '';
+  if (!steps.length){
+    const e = document.createElement('div'); e.className = 'empty';
+    e.textContent = 'Noch leer. Drück „Aufnahme“ und spiel ein paar Akkorde – jeder wird angehängt.';
+    box.append(e); return;
+  }
+  steps.forEach((s, i) => {
+    const d = document.createElement('div'); d.className = 'step'; d.dataset.i = i;
+    const n = document.createElement('div'); n.className = 'n';
+    n.textContent = s.root == null ? 'Pause' : chordName(s.root, s.type);
+    const c = document.createElement('div'); c.className = 'ctl';
+    const minus = document.createElement('button'); minus.textContent = '−';
+    const len = document.createElement('span'); len.textContent = s.beats + ' ♩';
+    const plus = document.createElement('button'); plus.textContent = '+';
+    const del = document.createElement('button'); del.textContent = '×';
+    minus.onclick = () => { s.beats = Math.max(1, s.beats - 1); renderSteps(); save(); };
+    plus.onclick = () => { s.beats = Math.min(16, s.beats + 1); renderSteps(); save(); };
+    del.onclick = () => { steps.splice(i, 1); renderSteps(); save(); };
+    c.append(minus, len, plus, del);
+    d.append(n, c); box.append(d);
+  });
+}
+function markStep(i){
+  document.querySelectorAll('.step').forEach(el => el.classList.toggle('now', +el.dataset.i === i));
+  const el = document.querySelector('.step.now'); if (el) el.scrollIntoView({block:'nearest', inline:'nearest'});
+}
+function startLoop(){
+  if (!steps.length){ toast('Der Loop ist noch leer – erst Akkorde aufnehmen.'); return; }
+  ensureAudio();
+  looping = true; loopIdx = 0; nextTime = ctx.currentTime + 0.08;
+  els.playBtn.classList.add('on'); els.playBtn.textContent = '■ Loop stoppen';
+  tick(); loopTimer = setInterval(tick, 25);
+}
+function tick(){
+  while (looping && nextTime < ctx.currentTime + 0.12){
+    if (loopIdx >= steps.length) loopIdx = 0;
+    const s = steps[loopIdx], t = nextTime, i = loopIdx;
+    if (s.root == null) engine.gateOff(t);
+    else { const v = leader.next(s.root, s.type, P); engine.play(v, t); setTimeout(() => { if (looping) { showChord(s.root, s.type, v.notes); } }, Math.max(0, (t - ctx.currentTime) * 1000)); }
+    setTimeout(() => { if (looping) markStep(i); }, Math.max(0, (t - ctx.currentTime) * 1000));
+    nextTime += s.beats * 60 / P.bpm;
+    loopIdx++;
+  }
+}
+function stopLoop(){
+  looping = false; clearInterval(loopTimer);
+  els.playBtn.classList.remove('on'); els.playBtn.textContent = '▶ Abspielen';
+  markStep(-1); release();
+}
+
+/* ---------- Export ---------- */
+function download(blob, name){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function loopSeconds(){ return steps.reduce((a, s) => a + s.beats, 0) * 60 / P.bpm; }
+async function exportWav(){
+  if (!steps.length){ toast('Der Loop ist leer.'); return; }
+  const passes = +els.passes.value, sr = 44100;
+  const tail = P.release + P.verbSize + (P.delMix > 0 ? 2 : 0) + 0.5;
+  const dur = loopSeconds() * passes + tail;
+  if (dur > 600){ toast('Zu lang für den Export (max. 10 Minuten).'); return; }
+  toast('WAV wird berechnet …');
+  const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const octx = new Off(2, Math.ceil(dur * sr), sr);
+  const eng = new Engine(octx, P);
+  const vl = new VoiceLeader();
+  let t = 0.02;
+  for (let k = 0; k < passes; k++) for (const s of steps){
+    if (s.root == null) eng.gateOff(t); else eng.play(vl.next(s.root, s.type, P), t);
+    t += s.beats * 60 / P.bpm;
+  }
+  eng.gateOff(t);
+  const buf = await octx.startRendering();
+  download(encodeWav(buf), 'chordwave-loop.wav');
+  toast('WAV gespeichert.');
+}
+function encodeWav(buf){
+  const ch = buf.numberOfChannels, len = buf.length, sr = buf.sampleRate;
+  const data = []; for (let c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+  let peak = 0; for (const d of data) for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]));
+  const norm = peak > 0.99 ? 0.99 / peak : 1;
+  const ab = new ArrayBuffer(44 + len * ch * 2), v = new DataView(ab);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + len * ch * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, ch, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, len * ch * 2, true);
+  let o = 44;
+  for (let i = 0; i < len; i++) for (let c = 0; c < ch; c++){
+    const s = Math.max(-1, Math.min(1, data[c][i] * norm));
+    v.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true); o += 2;
+  }
+  return new Blob([ab], {type:'audio/wav'});
+}
+function exportMidi(){
+  if (!steps.length){ toast('Der Loop ist leer.'); return; }
+  const PPQ = 480, passes = +els.passes.value, vl = new VoiceLeader(), ev = [];
+  let tick = 0;
+  for (let k = 0; k < passes; k++) for (const s of steps){
+    const len = s.beats * PPQ;
+    if (s.root != null){
+      const v = vl.next(s.root, s.type, P);
+      const notes = [...new Set(v.notes)];
+      if (P.bass) notes.push(v.bass);
+      for (const n of notes){
+        ev.push({t:tick, d:[0x90, n, n === v.bass && P.bass ? 85 : 92], off:0});
+        ev.push({t:tick + len - 1, d:[0x80, n, 0], off:1});
+      }
+    }
+    tick += len;
+  }
+  ev.sort((a, b) => a.t - b.t || b.off - a.off);
+  const bytes = [];
+  const vlq = n => { const out = [n & 0x7f]; while ((n >>= 7)) out.unshift((n & 0x7f) | 0x80); bytes.push(...out); };
+  const tempo = Math.round(60000000 / P.bpm);
+  const name = 'Chordwave';
+  vlq(0); bytes.push(0xff, 0x03, name.length, ...[...name].map(c => c.charCodeAt(0)));
+  vlq(0); bytes.push(0xff, 0x51, 0x03, (tempo >> 16) & 255, (tempo >> 8) & 255, tempo & 255);
+  vlq(0); bytes.push(0xff, 0x58, 0x04, 4, 2, 24, 8);
+  let last = 0;
+  for (const e of ev){ vlq(e.t - last); last = e.t; bytes.push(...e.d); }
+  vlq(0); bytes.push(0xff, 0x2f, 0x00);
+  const head = [0x4d,0x54,0x68,0x64, 0,0,0,6, 0,0, 0,1, (PPQ >> 8) & 255, PPQ & 255];
+  const L = bytes.length;
+  const trk = [0x4d,0x54,0x72,0x6b, (L >>> 24) & 255, (L >> 16) & 255, (L >> 8) & 255, L & 255];
+  download(new Blob([new Uint8Array([...head, ...trk, ...bytes])], {type:'audio/midi'}), 'chordwave-loop.mid');
+  toast('MIDI gespeichert.');
+}
+
+/* ---------- Tastatur-Anzeige ---------- */
+const KB_LO = 36, KB_HI = 85;
+function draw(){
+  const cv = els.kb, dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const css = getComputedStyle(document.documentElement);
+  const isBlack = m => [1,3,6,8,10].includes(m % 12);
+  const whites = []; for (let m = KB_LO; m < KB_HI; m++) if (!isBlack(m)) whites.push(m);
+  const ww = w / whites.length;
+  const xOf = m => { // kontinuierliche Position einer (auch gebrochenen) Tonhöhe
+    const lo = Math.floor(m), fr = m - lo;
+    const c = n => { const wi = whites.filter(x => x < n).length; return isBlack(n) ? wi * ww : wi * ww + ww / 2; };
+    return c(lo) + (c(lo + 1) - c(lo)) * fr;
+  };
+  g.fillStyle = '#e9e6f3'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#8f8aa6'; g.lineWidth = 1;
+  whites.forEach((m, i) => { g.beginPath(); g.moveTo(i * ww + .5, 0); g.lineTo(i * ww + .5, h); g.stroke(); });
+  for (let m = KB_LO; m < KB_HI; m++) if (isBlack(m)){
+    const x = xOf(m); g.fillStyle = '#1a1726'; g.fillRect(x - ww * 0.32, 0, ww * 0.64, h * 0.6);
+  }
+  if (engine){
+    const t = ctx.currentTime, lvl = engine.amp.gain.value;
+    const acc = css.getPropertyValue('--accent').trim(), acc2 = css.getPropertyValue('--accent2').trim();
+    g.globalAlpha = Math.min(1, lvl * 1.4 + 0.08);
+    engine.voices.forEach((v, i) => {
+      const isBass = i === MAX_VOICES;
+      if (!isBass && i >= P.voices) return;
+      if (isBass && !P.bass) return;
+      const m = ftom(engine.freqAt(v, t));
+      if (m < KB_LO || m > KB_HI - 1) return;
+      const x = xOf(m);
+      g.fillStyle = isBass ? acc2 : acc;
+      g.beginPath(); g.arc(x, h * 0.8, Math.min(9, ww * 0.45), 0, Math.PI * 2); g.fill();
+    });
+    g.globalAlpha = 1;
+  }
+  requestAnimationFrame(draw);
+}
+
+/* ---------- UI aufbauen ---------- */
+const els = {};
+['chordName','kb','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+ 'latchBtn','stopBtn','preset','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
+let toastTimer = 0;
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
+
+function padPress(btn, onDown, onUp){
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); btn.classList.add('hit'); onDown(); });
+  const up = () => { if (!btn.classList.contains('hit')) return; btn.classList.remove('hit'); onUp && onUp(); };
+  btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up);
+}
+const rootBtns = [], typeBtns = [];
+NOTE_NAMES.forEach((n, i) => {
+  const b = document.createElement('button'); b.className = 'pad' + (n.includes('#') ? ' sharp' : '');
+  b.textContent = n; const k = document.createElement('kbd'); k.textContent = US_LABELS[ROOT_CODES[i]]; b.append(k);
+  padPress(b, () => rootDown(i, 'p'), () => rootUp(i, 'p'));
+  els.roots.append(b); rootBtns.push(b);
+});
+CHORDS.forEach((c, i) => {
+  const b = document.createElement('button'); b.className = 'pad';
+  b.textContent = c.label; const k = document.createElement('kbd'); k.textContent = US_LABELS[TYPE_CODES[i]]; b.append(k);
+  padPress(b, () => typeDown(i));
+  els.types.append(b); typeBtns.push(b);
+});
+function rootDown(i, src){ held.add(src + i); playChord(i, curType); }
+function rootUp(i, src){
+  held.delete(src + i);
+  if (latch || looping) return;
+  if (![...held].some(k => k[0] === 'p' || k[0] === 'k')) release();
+}
+function typeDown(i){
+  curType = i;
+  if (curRoot != null && (sounding || held.size)) playChord(curRoot, i, true);
+  else typeBtns.forEach((b, j) => b.classList.toggle('sel', j === i));
+}
+// Beschriftung an echtes Tastaturlayout anpassen (z. B. Z statt Y auf deutscher Tastatur)
+if (navigator.keyboard && navigator.keyboard.getLayoutMap){
+  navigator.keyboard.getLayoutMap().then(map => {
+    rootBtns.forEach((b, i) => { const l = map.get(ROOT_CODES[i]); if (l) b.querySelector('kbd').textContent = l.toUpperCase(); });
+    typeBtns.forEach((b, i) => { const l = map.get(TYPE_CODES[i]); if (l) b.querySelector('kbd').textContent = l.toUpperCase(); });
+  }).catch(() => {});
+}
+window.addEventListener('keydown', e => {
+  if (e.target.matches('input,select,textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'Space'){ e.preventDefault(); if (!e.repeat) stopAll(); return; }
+  if (e.repeat) return;
+  const r = ROOT_CODES.indexOf(e.code);
+  if (r >= 0){ e.preventDefault(); rootBtns[r].classList.add('hit'); rootDown(r, 'k'); return; }
+  const t = TYPE_CODES.indexOf(e.code);
+  if (t >= 0){ e.preventDefault(); typeBtns[t].classList.add('hit'); typeDown(t); }
+});
+window.addEventListener('keyup', e => {
+  const r = ROOT_CODES.indexOf(e.code);
+  if (r >= 0){ rootBtns[r].classList.remove('hit'); rootUp(r, 'k'); }
+  const t = TYPE_CODES.indexOf(e.code);
+  if (t >= 0) typeBtns[t].classList.remove('hit');
+});
+window.addEventListener('blur', () => { if (!latch) { held.clear(); release(); } document.querySelectorAll('.pad.hit').forEach(b => b.classList.remove('hit')); });
+
+// Regler
+const knobEls = {};
+for (const k of KNOBS){
+  if (k.length === 1){ const g = document.createElement('div'); g.className = 'group'; g.textContent = k[0]; els.knobs.append(g); continue; }
+  const [key, label, min, max, step, fmt, log] = k;
+  const wrap = document.createElement('label'); wrap.className = 'knob';
+  const t = document.createElement('div'); t.className = 't';
+  const name = document.createElement('span'); name.textContent = label;
+  const val = document.createElement('b'); t.append(name, val);
+  const inp = document.createElement('input'); inp.type = 'range';
+  if (log){ inp.min = 0; inp.max = 1000; inp.step = 1; } else { inp.min = min; inp.max = max; inp.step = step; }
+  const toV = x => log ? min * Math.pow(max / min, x / 1000) : +x;
+  const fromV = v => log ? Math.round(1000 * Math.log(v / min) / Math.log(max / min)) : v;
+  inp.addEventListener('input', () => { P[key] = toV(inp.value); val.textContent = fmt(P[key]); changed(key); });
+  wrap.append(t, inp); els.knobs.append(wrap);
+  knobEls[key] = {set: v => { inp.value = fromV(v); val.textContent = fmt(v); }};
+}
+function syncUI(){
+  for (const key in knobEls) knobEls[key].set(P[key]);
+  els.wave.value = P.wave; els.bass.checked = P.bass; els.retrig.checked = P.retrig; els.bpm.value = P.bpm;
+  els.latchBtn.classList.toggle('on', latch);
+}
+let applyTimer = 0;
+function changed(key){
+  save();
+  if (!engine) return;
+  cancelAnimationFrame(applyTimer);
+  applyTimer = requestAnimationFrame(() => {
+    engine.apply(P);
+    // Stimmenzahl/Lage sofort hörbar machen
+    if ((key === 'voices' || key === 'octave' || key === 'preset') && sounding && curRoot != null && !looping){
+      leader.prev = null;
+      const v = leader.next(curRoot, curType, P);
+      engine.play(v, ctx.currentTime + 0.01);
+      showChord(curRoot, curType, v.notes);
+    }
+  });
+}
+Object.keys(PRESETS).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.preset.append(o); });
+const custom = document.createElement('option'); custom.textContent = '— eigener —'; custom.value = ''; els.preset.append(custom);
+els.preset.value = saved.preset ?? 'Weiches Pad';
+els.preset.addEventListener('change', () => {
+  if (!els.preset.value) return;
+  const bpm = P.bpm; Object.assign(P, DEFAULTS, PRESETS[els.preset.value], {bpm});
+  syncUI(); changed('preset');
+});
+els.knobs.addEventListener('input', () => { els.preset.value = ''; });
+els.wave.addEventListener('change', () => { P.wave = els.wave.value; els.preset.value = ''; changed(); });
+els.bass.addEventListener('change', () => { P.bass = els.bass.checked; changed(); });
+els.retrig.addEventListener('change', () => { P.retrig = els.retrig.checked; changed(); });
+els.bpm.addEventListener('change', () => { P.bpm = Math.max(40, Math.min(240, +els.bpm.value || 90)); els.bpm.value = P.bpm; changed(); });
+els.latchBtn.addEventListener('click', () => { latch = !latch; els.latchBtn.classList.toggle('on', latch); if (!latch && !held.size) release(); save(); });
+els.stopBtn.addEventListener('click', stopAll);
+els.recBtn.addEventListener('click', () => { recording = !recording; els.recBtn.classList.toggle('on', recording); if (recording) toast('Aufnahme an: jeder Akkord wird angehängt.'); });
+els.pauseStepBtn.addEventListener('click', () => addStep({root:null, type:0, beats:+els.stepBeats.value}));
+els.playBtn.addEventListener('click', () => looping ? stopLoop() : startLoop());
+els.clearBtn.addEventListener('click', () => { if (!steps.length || confirm('Loop wirklich leeren?')) { if (looping) stopLoop(); steps = []; renderSteps(); save(); } });
+els.wavBtn.addEventListener('click', () => exportWav().catch(e => toast('WAV-Export fehlgeschlagen: ' + e.message)));
+els.midiBtn.addEventListener('click', exportMidi);
+window.addEventListener('pagehide', saveNow);
+
+syncUI(); renderSteps();
+requestAnimationFrame(draw);
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
