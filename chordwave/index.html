@@ -138,6 +138,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
       <div class="row">
         <button id="pauseStepBtn">+ Pause anhängen</button>
         <button id="clearBtn">Loop leeren</button>
+        <button id="loopResetBtn">↺ Zurücksetzen</button>
       </div>
     </div>
     <div class="box">
@@ -170,6 +171,13 @@ input[type=range]{width:100%;accent-color:var(--accent);height:26px;margin:0}
     <div class="box">
       <div class="row">
         <label>Preset <select id="preset"></select></label>
+      </div>
+      <div class="row">
+        <button id="presetSaveBtn">💾 Speichern</button>
+        <button id="presetDelBtn">Löschen</button>
+        <button id="soundResetBtn">↺ Zurücksetzen</button>
+      </div>
+      <div class="row">
         <label>Welle <select id="wave">
           <option value="sawtooth">Säge</option><option value="square">Rechteck</option>
           <option value="triangle">Dreieck</option><option value="sine">Sinus</option></select></label>
@@ -347,7 +355,14 @@ const STYLES = {
   'Ambient':      {mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{}},
   'Episch':       {mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}}},
 };
-function colorize(st, mode, d){
+// Farbe wählen, aber nur wenn alle Töne in der Tonart liegen (sonst z. B. Gmaj7 in C-Dur vermeiden)
+function colorize(st, k, d){
+  const c = colorizeRaw(st, k.mode, d), root = diatonic(k, d).root, sc = new Set(scalePcs(k));
+  if (chordPcs(root, c).every(x => sc.has(x))) return c;
+  if (chordPcs(root, TI('7')).every(x => sc.has(x)) && st.dom) return TI('7');
+  return diatonic(k, d).type;
+}
+function colorizeRaw(st, mode, d){
   const base = MODES[mode].q[d];
   if (d === 4 && st.dom && Math.random() < 0.7) return TI(st.dom);
   const opts = st.color[base];
@@ -365,9 +380,10 @@ function genPhrase(st, mode, startDeg, len){
     if (st.boost[prev]) for (const [d, b] of Object.entries(st.boost[prev])) w[d] = (w[d] || 0) + b;
     if (st.noDim) delete w[mode === 'maj' ? 6 : 1];
     delete w[prev];
+    delete w[0];                                   // Tonika nur am Phrasenanfang
+    for (const d in w) if (degs.includes(+d)) w[d] *= 0.2;   // Abwechslung in der Phrase
     if (i === len - 1){ // letzter Akkord führt zurück zur Tonika
       for (const d in w) w[d] *= (T[d] && T[d][0] ? T[d][0] : 0.2);
-      delete w[0];
     }
     degs.push(Object.keys(w).length ? pickW(w) : 4);
   }
@@ -377,19 +393,23 @@ function generate(seconds, styleName, key){
   const st = STYLES[styleName];
   let k = {...key};
   if (st.mode && st.mode !== k.mode) k = st.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
-  const totalBeats = Math.max(4, Math.round(seconds * P.bpm / 60));
-  const beats = st.beats[Math.floor(Math.random() * st.beats.length)];
+  let beats = st.beats[Math.floor(Math.random() * st.beats.length)];
+  const want = seconds * P.bpm / 60;
+  if (beats * st.phrase > want) beats = st.beats[0];              // kurze Dauer: kürzere Akkorde
+  const unit = beats * st.phrase;                                  // eine Phrase
+  const totalBeats = Math.max(unit, Math.round(want / unit) * unit);
   const A = genPhrase(st, k.mode, 0, st.phrase);
-  const B = genPhrase(st, k.mode, Math.random() < 0.5 ? 3 : 5, st.phrase);
+  let bStart = Math.random() < 0.5 ? 3 : 5;
+  if (A[A.length - 1] === bStart) bStart = bStart === 3 ? 5 : 3;
+  const B = genPhrase(st, k.mode, bStart, st.phrase);
   const form = [A, A, B, A];
-  const colA = A.map(d => colorize(st, k.mode, d)), colB = B.map(d => colorize(st, k.mode, d));
+  const colA = A.map(d => colorize(st, k, d)), colB = B.map(d => colorize(st, k, d));
   const out = []; let sum = 0, f = 0;
   while (sum < totalBeats){
     const ph = form[f % form.length], cols = ph === A ? colA : colB;
     for (let i = 0; i < ph.length && sum < totalBeats; i++){
       const c = diatonic(k, ph[i]);
-      const b = Math.min(beats, totalBeats - sum);
-      out.push({root:c.root, type:cols[i], beats:b}); sum += b;
+      out.push({root:c.root, type:cols[i], beats}); sum += beats;
     }
     f++;
   }
@@ -534,7 +554,7 @@ const KNOBS = [
   ['Hüllkurve'],
   ['attack','Anschwellen',0,3,0.005, v=>v.toFixed(2)+' s'],
   ['decay','Abfall',0.02,3,0.01, v=>v.toFixed(2)+' s'],
-  ['sustain','Halten',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['sustain','Haltepegel',0,1,0.01, v=>Math.round(v*100)+'%'],
   ['release','Ausklang',0.02,5,0.01, v=>v.toFixed(2)+' s'],
   ['Filter'],
   ['cutoff','Filter',80,12000,0, v=>v>=1000?(v/1000).toFixed(1)+' kHz':Math.round(v)+' Hz', true],
@@ -701,6 +721,7 @@ function startLoop(){
   tick(); loopTimer = setInterval(tick, 25);
 }
 function tick(){
+  if (looping && nextTime < ctx.currentTime - 0.05) nextTime = ctx.currentTime + 0.05;
   while (looping && nextTime < ctx.currentTime + 0.12){
     if (loopIdx >= steps.length) loopIdx = 0;
     const s = steps[loopIdx], t = nextTime, i = loopIdx;
@@ -812,12 +833,19 @@ function fitCanvas(cv){
   return {g, w, h};
 }
 function draw(){
+  requestAnimationFrame(draw);
+  try { drawLines(); } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
+}
+function drawLines(){
   const {g, w, h} = fitCanvas(els.scope);
   g.clearRect(0, 0, w, h);
   const now = ctx ? ctx.currentTime : 0;
   if (engine){
     const lvl = engine.amp.gain.value;
-    hist.push({t:now, a:lvl, m:engine.voices.map(v => ftom(engine.freqAt(v, now)))});
+    // sichtbar, solange der Akkord gehalten wird – auch wenn er leise ausklingt (z. B. Pluck)
+    const vis = engine.gate ? Math.max(lvl, 0.35) : lvl;
+    const m = engine.voices.map(v => ftom(engine.freqAt(v, now)));
+    if (m.every(Number.isFinite)) hist.push({t:now, a:vis, m});
     while (hist.length && hist[0].t < now - WIN - 0.5) hist.shift();
   }
   // sichtbaren Tonbereich weich nachführen
@@ -826,6 +854,7 @@ function draw(){
     if (i === MAX_VOICES ? !P.bass : i >= P.voices) continue;
     lo = Math.min(lo, f.m[i]); hi = Math.max(hi, f.m[i]);
   }
+  if (!Number.isFinite(viewLo) || !Number.isFinite(viewHi) || viewHi - viewLo < 6){ viewLo = 52; viewHi = 76; }
   if (lo < Infinity){
     let tl = lo - 3, th = hi + 3;
     if (th - tl < 18){ const c = (tl + th) / 2; tl = c - 9; th = c + 9; }
@@ -873,13 +902,12 @@ function draw(){
     }
     g.globalAlpha = 1; g.shadowBlur = 0;
   }
-  requestAnimationFrame(draw);
 }
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
 ['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
- 'latchBtn','stopBtn','preset','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
+ 'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -975,15 +1003,66 @@ function changed(key){
     }
   });
 }
-Object.keys(PRESETS).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.preset.append(o); });
-const custom = document.createElement('option'); custom.textContent = '— eigener —'; custom.value = ''; els.preset.append(custom);
-els.preset.value = saved.preset ?? 'Weiches Pad';
-els.preset.addEventListener('change', () => {
-  if (!els.preset.value) return;
-  const bpm = P.bpm; Object.assign(P, DEFAULTS, PRESETS[els.preset.value], {bpm});
+// Presets: eingebaute (b:Name) und eigene (u:Name)
+const USTORE = 'chordwave.presets';
+let userPresets = {};
+try { userPresets = JSON.parse(localStorage.getItem(USTORE) || '{}') || {}; } catch(e){}
+const SOUND_KEYS = Object.keys(DEFAULTS).filter(k => k !== 'bpm');
+function soundOf(p){ const o = {}; SOUND_KEYS.forEach(k => o[k] = p[k]); return o; }
+function fillPresets(sel){
+  els.preset.innerHTML = '';
+  const g1 = document.createElement('optgroup'); g1.label = 'Eingebaut';
+  Object.keys(PRESETS).forEach(n => { const o = document.createElement('option'); o.value = 'b:' + n; o.textContent = n; g1.append(o); });
+  els.preset.append(g1);
+  const names = Object.keys(userPresets).sort();
+  if (names.length){
+    const g2 = document.createElement('optgroup'); g2.label = 'Eigene';
+    names.forEach(n => { const o = document.createElement('option'); o.value = 'u:' + n; o.textContent = n; g2.append(o); });
+    els.preset.append(g2);
+  }
+  const c = document.createElement('option'); c.value = ''; c.textContent = '— geändert —'; els.preset.append(c);
+  els.preset.value = sel || '';
+  if (els.preset.value !== (sel || '')) els.preset.value = '';
+  els.presetDelBtn.disabled = !els.preset.value.startsWith('u:');
+}
+function loadPreset(v){
+  const bpm = P.bpm;
+  if (v.startsWith('b:')) Object.assign(P, DEFAULTS, PRESETS[v.slice(2)], {bpm});
+  else if (v.startsWith('u:')) Object.assign(P, DEFAULTS, userPresets[v.slice(2)], {bpm});
   syncUI(); changed('preset');
+}
+let savedPreset = saved.preset;
+if (savedPreset && !savedPreset.includes(':')) savedPreset = PRESETS[savedPreset] ? 'b:' + savedPreset : '';
+fillPresets(savedPreset ?? 'b:Weiches Pad');
+els.preset.addEventListener('change', () => {
+  els.presetDelBtn.disabled = !els.preset.value.startsWith('u:');
+  if (els.preset.value) loadPreset(els.preset.value);
+  save();
 });
-els.knobs.addEventListener('input', () => { els.preset.value = ''; });
+els.presetSaveBtn.addEventListener('click', () => {
+  const cur = els.preset.value.startsWith('u:') ? els.preset.value.slice(2) : '';
+  const name = (prompt('Name für deinen Sound:', cur || 'Mein Sound') || '').trim().slice(0, 40);
+  if (!name) return;
+  if (userPresets[name] && name !== cur && !confirm(`„${name}“ gibt es schon. Überschreiben?`)) return;
+  userPresets[name] = soundOf(P);
+  try { localStorage.setItem(USTORE, JSON.stringify(userPresets)); } catch(e){ toast('Speichern nicht möglich (privater Modus?)'); }
+  fillPresets('u:' + name); save();
+  toast(`Sound „${name}“ gespeichert.`);
+});
+els.presetDelBtn.addEventListener('click', () => {
+  const v = els.preset.value; if (!v.startsWith('u:')) return;
+  const name = v.slice(2);
+  if (!confirm(`Sound „${name}“ löschen?`)) return;
+  delete userPresets[name];
+  try { localStorage.setItem(USTORE, JSON.stringify(userPresets)); } catch(e){}
+  fillPresets(''); save();
+});
+els.soundResetBtn.addEventListener('click', () => {
+  if (!confirm('Alle Sound-Regler auf Standard zurücksetzen?')) return;
+  fillPresets('b:Weiches Pad'); loadPreset('b:Weiches Pad'); save();
+  toast('Sound zurückgesetzt.');
+});
+els.knobs.addEventListener('input', () => { els.preset.value = ''; els.presetDelBtn.disabled = true; });
 els.wave.addEventListener('change', () => { P.wave = els.wave.value; els.preset.value = ''; changed(); });
 els.bass.addEventListener('change', () => { P.bass = els.bass.checked; changed(); });
 els.retrig.addEventListener('change', () => { P.retrig = els.retrig.checked; changed(); });
@@ -993,6 +1072,15 @@ els.stopBtn.addEventListener('click', stopAll);
 els.recBtn.addEventListener('click', () => { recording = !recording; els.recBtn.classList.toggle('on', recording); if (recording) toast('Aufnahme an: jeder Akkord wird angehängt.'); });
 els.pauseStepBtn.addEventListener('click', () => addStep({root:null, type:0, beats:+els.stepBeats.value}));
 els.playBtn.addEventListener('click', () => looping ? stopLoop() : startLoop());
+els.loopResetBtn.addEventListener('click', () => {
+  if (!confirm('Loop leeren und Tempo, Akkordlänge, Export und Generator auf Standard setzen?')) return;
+  if (looping) stopLoop();
+  steps = []; selStep = -1; undoSteps = null; els.undoBtn.disabled = true;
+  P.bpm = DEFAULTS.bpm; els.bpm.value = P.bpm; els.stepBeats.value = '4'; els.passes.value = '2';
+  els.genDur.value = '30'; els.genStyle.selectedIndex = 0; els.genKey.value = 'cur';
+  if (recording) els.recBtn.click();
+  renderSteps(); changed(); toast('Loop zurückgesetzt.');
+});
 els.clearBtn.addEventListener('click', () => { if (!steps.length || confirm('Loop wirklich leeren?')) { if (looping) stopLoop(); steps = []; renderSteps(); save(); } });
 els.wavBtn.addEventListener('click', () => exportWav().catch(e => toast('WAV-Export fehlgeschlagen: ' + e.message)));
 els.midiBtn.addEventListener('click', exportMidi);
@@ -1015,12 +1103,13 @@ els.genBtn.addEventListener('click', () => {
   const g = generate(+els.genDur.value, els.genStyle.value, key);
   undoSteps = steps.map(x => ({...x})); els.undoBtn.disabled = false;
   if (looping) stopLoop();
+  if (engine) engine.gateOff(ctx.currentTime + 0.005);
   steps = g.steps; selStep = -1; renderSteps(); save();
   chordHist = []; leader.prev = null;
   if (els.keySel.value !== 'auto'){ keyFixed = g.key; els.keySel.value = KEYS.findIndex(k => k.root === g.key.root && k.mode === g.key.mode); }
   const secs = Math.round(steps.reduce((a, x) => a + x.beats, 0) * 60 / P.bpm);
   toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
-  startLoop();
+  setTimeout(startLoop, 120);
 });
 els.undoBtn.addEventListener('click', () => {
   if (!undoSteps) return;
