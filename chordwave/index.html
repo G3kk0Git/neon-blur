@@ -132,7 +132,7 @@ body.focus #focus{display:block}
 .fbar.cur{border:2px solid var(--accent2)}
 .fbar.play{background:#232042;border-color:var(--accent)}
 .fbar .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:0}
-#fGraph{width:100%;height:180px;display:block;background:#07060c;border:1px solid var(--line);border-radius:12px;touch-action:none}
+#fGraph{width:100%;height:150px;display:block;background:#07060c;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
 .fvoice{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .fvoice .row{gap:6px}
 .fvoice .row button{height:34px;padding:0 10px;font-size:13px}
@@ -151,6 +151,17 @@ body.focus #focus{display:block}
 .finfo{display:flex;align-items:baseline;gap:12px;min-height:44px}
 .finfo .chordname .r{font-size:34px}
 .finfo .chordname .q{font-size:20px}
+.finfo .fstatus{flex:1}
+.fdet{flex:0 0 auto;height:38px;padding:0 10px;font-size:13px;font-weight:600;border-color:var(--accent2);color:var(--accent2)}
+.ftypes .more{color:var(--accent2);font-weight:600}
+/* Takt-Detailansicht */
+#detail{display:none;position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:7;
+  padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+#detail.on{display:block}
+#detail .dfin{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+#detail .fhead h2{text-align:center;flex:1;margin:0;font-size:17px}
+#detail .fhead h2 small{display:block;color:var(--dim);font-weight:500;font-size:12px}
+#dGraph{width:100%;height:clamp(220px,38dvh,380px);display:block;background:#07060c;border:1px solid var(--line);border-radius:12px;touch-action:none}
 .fstatus{font-size:12px;color:var(--dim);line-height:1.35}
 .froots{display:grid;grid-template-columns:repeat(9,1fr);gap:5px}
 .froots button{height:46px;padding:0;font-size:18px;font-weight:700;border-radius:10px}
@@ -257,6 +268,15 @@ body.focus #focus{display:block}
       </div>
     </div>
     <div class="box">
+      <span class="lbl">Beat</span>
+      <div class="row">
+        <label>Muster <select id="beatSel"></select></label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px">Lautstärke <input type="range" id="beatVol" min="0" max="1" step="0.01" style="flex:1"></label>
+      </div>
+      <div class="row"><button id="beatTempo">Tempo des Beats übernehmen</button></div>
+      <p class="hint">Der Beat läuft mit, wenn der Loop spielt, und ist im WAV- und MIDI-Export enthalten.</p>
+    </div>
+    <div class="box">
       <span class="lbl">Generator</span>
       <div class="row">
         <label>Dauer <select id="genDur">
@@ -298,6 +318,10 @@ body.focus #focus{display:block}
           <option value="triangle">Dreieck</option><option value="sine">Sinus</option></select></label>
       </div>
       <div class="row">
+        <label>Arpeggiator <select id="arp"><option value="off">aus</option><option value="up">aufwärts</option><option value="down">abwärts</option><option value="updown">auf &amp; ab</option><option value="random">zufällig</option></select></label>
+        <label><select id="arpRate"><option value="2">1/8</option><option value="4">1/16</option></select></label>
+      </div>
+      <div class="row">
         <label>Audio <select id="latency">
           <option value="playback">stabil (empfohlen)</option><option value="balanced">ausgewogen</option><option value="interactive">schnell (kann knistern)</option></select></label>
       </div>
@@ -322,22 +346,8 @@ body.focus #focus{display:block}
   </div>
   <div class="fbars" id="fBars"></div>
   <canvas id="fGraph"></canvas>
-  <div class="fvoice" id="fVoice">
-    <div class="t" id="fVoiceInfo"></div>
-    <div class="row">
-      <button id="fvSync" title="Alle Stimmen wechseln gleichzeitig">⇉ Gleichzeitig</button>
-      <button id="fvDice" title="Neue zufällige Einsätze für diesen Takt">🎲 Neu würfeln</button>
-      <button id="fvMove" title="Bewegung innerhalb des Akkords: automatisch / an / aus">↝ Bewegung: auto</button>
-      <button id="fvReset" title="Eigene Einstellungen dieses Takts entfernen">↺</button>
-    </div>
-    <div class="vgrid" id="fvGrid"></div>
-    <div class="row"><label style="flex:0 0 auto"><input type="checkbox" id="fvFree"> Höhe auch zwischen den Akkordtönen (halbtonweise)</label></div>
-    <div class="row">
-      <label>Versatz (alle) <input type="range" id="fvStagger" min="0" max="1" step="0.01"></label>
-      <label>Bewegung (alle) <input type="range" id="fvMotion" min="0" max="1" step="0.01"></label>
-    </div>
-  </div>
-  <div class="finfo"><div class="chordname" id="fChord"><span class="r">–</span></div><div class="fstatus" id="fStatus"></div></div>
+  <div class="finfo"><div class="chordname" id="fChord"><span class="r">–</span></div><div class="fstatus" id="fStatus"></div>
+    <button id="fDetail" class="fdet" title="Stimmen dieses Takts im Detail bearbeiten">🔍 Takt-Details</button></div>
   <div class="sugs" id="fSugRow"><span class="t">passt<br>hier:</span><span id="fSugs" style="display:contents"></span></div>
   <div class="froots" id="fRoots"></div>
   <div class="ftypes" id="fTypes"></div>
@@ -346,6 +356,7 @@ body.focus #focus{display:block}
     <select id="fLen" title="Länge eines neuen Akkords"><option value="4">1 Takt</option><option value="2">½ Takt</option></select>
     <label class="fadv"><input type="checkbox" id="fAdvance"> danach weiter</label>
     <span class="bpm"><button id="fBpmDown">−</button><span id="fBpm"></span><button id="fBpmUp">+</button></span>
+    <select id="fBeat" title="Beat"></select>
   </div>
   <div class="fctl">
     <button id="fUndo" disabled>↶</button><button id="fRedo" disabled>↷</button>
@@ -353,6 +364,38 @@ body.focus #focus{display:block}
     <button id="fGen" title="Abfolge für alle Takte erzeugen (Stil wie im Loop-Tab)">✨ Erzeugen</button>
     <span class="sp"></span>
     <button id="fSound">Sound</button>
+  </div>
+ </div>
+</div>
+
+<div id="detail">
+ <div class="dfin">
+  <div class="fhead">
+    <button id="dPrev" title="voriger Takt">◀</button>
+    <h2 id="dTitle">Takt</h2>
+    <button id="dNext" title="nächster Takt">▶</button>
+    <button id="dHear" title="Akkord anhören">🔊</button>
+    <button id="dClose" title="schließen">✕</button>
+  </div>
+  <canvas id="dGraph"></canvas>
+  <p class="hint">Punkt ziehen: <b>seitlich</b> = später/früher einsetzen, <b>hoch/runter</b> = andere Tonhöhe (rastet auf Akkordtönen ein). Die unterste lila Linie ist der Bass.</p>
+  <div class="fvoice" id="fVoice">
+    <div class="t" id="fVoiceInfo"></div>
+    <div class="row">
+      <button id="fvSync" title="Alle Stimmen wechseln gleichzeitig">⇉ Gleichzeitig</button>
+      <button id="fvDice" title="Neue zufällige Einsätze für diesen Takt">🎲 Neu würfeln</button>
+      <button id="fvMove" title="Bewegung innerhalb des Akkords: automatisch / an / aus">↝ Bewegung: auto</button>
+      <button id="fvReset" title="Eigene Einstellungen dieses Takts entfernen">↺ Zurücksetzen</button>
+    </div>
+    <div class="vgrid" id="fvGrid"></div>
+    <div class="row"><label style="flex:0 0 auto"><input type="checkbox" id="fvFree"> Höhe auch zwischen den Akkordtönen (halbtonweise)</label></div>
+  </div>
+  <div class="fvoice">
+    <div class="t">Für alle Takte</div>
+    <div class="row">
+      <label>Versatz <input type="range" id="fvStagger" min="0" max="1" step="0.01"></label>
+      <label>Bewegung <input type="range" id="fvMotion" min="0" max="1" step="0.01"></label>
+    </div>
   </div>
  </div>
 </div>
@@ -799,6 +842,17 @@ function generate(seconds, styleName, key, exactBeats){
   return {steps:out, key:k};
 }
 
+/* ---------- Beats (16 Schritte pro Takt) ---------- */
+const BEATS = {
+  'House (4/4)':       {bpm:124, parts:{k:'x...x...x...x...', c:'....x.......x...', h:'..o...o...o...o.'}},
+  'Progressive House': {bpm:128, parts:{k:'x...x...x...x...', c:'....x.......x...', h:'.o.o.o.o.o.o.o.o', o:'..x...x...x...x.'}},
+  'Breakbeat':         {bpm:110, parts:{k:'x.....x...x.....', s:'....x.......x..o', h:'o.o.o.o.o.o.o.o.'}},
+  'Lo-Fi (Swing)':     {bpm:84,  swing:0.33, parts:{k:'x......o..x.....', s:'....x.......x...', h:'o.o.o.o.o.o.o.oo'}},
+  'Half-Time':         {bpm:140, parts:{k:'x.........x.....', s:'........x.......', h:'o.o.o.o.o.o.o.o.'}},
+  'Minimal':           {bpm:120, parts:{k:'x...x...x...x...', r:'..........o.x...', h:'..o...o...o...o.'}},
+};
+const DRUM_MIDI = {k:36, s:38, c:39, h:42, o:46, r:37};
+
 /* ---------- Klangerzeugung ---------- */
 const MAX_VOICES = 6;
 function makeImpulse(ctx, seconds){
@@ -833,20 +887,28 @@ class Engine{
     this.filter = ctx.createBiquadFilter(); this.filter.type = 'lowpass';
     this.bus = ctx.createGain();
     this.bus.connect(this.filter); this.filter.connect(this.amp);
-    this.dry = ctx.createGain(); this.amp.connect(this.dry); this.dry.connect(this.master);
+    // Pumpen (Sidechain-Effekt) sitzt hinter der Hüllkurve, vor Hall und Echo
+    this.pump = ctx.createGain(); this.amp.connect(this.pump);
+    this.dry = ctx.createGain(); this.pump.connect(this.dry); this.dry.connect(this.master);
     this.verb = ctx.createConvolver(); this.verbWet = ctx.createGain();
-    this.amp.connect(this.verb); this.verb.connect(this.verbWet); this.verbWet.connect(this.master);
+    this.pump.connect(this.verb); this.verb.connect(this.verbWet); this.verbWet.connect(this.master);
     this.delay = ctx.createDelay(2); this.fb = ctx.createGain(); this.delWet = ctx.createGain();
-    this.amp.connect(this.delay); this.delay.connect(this.fb); this.fb.connect(this.delay);
+    this.pump.connect(this.delay); this.delay.connect(this.fb); this.fb.connect(this.delay);
+    // Drums: eigener Weg, nicht gepumpt, nicht gefiltert
+    this.drumBus = ctx.createGain(); this.drumBus.connect(this.master);
+    const nb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    this.noise = nb;
     this.delay.connect(this.delWet); this.delWet.connect(this.master); this.delWet.connect(this.verb);
     this.lfo = ctx.createOscillator(); this.lfoGain = ctx.createGain();
     this.lfo.connect(this.lfoGain); this.lfoGain.connect(this.filter.detune); this.lfo.start();
     this.voices = [];
     for (let i = 0; i < MAX_VOICES + 1; i++){
-      const g = ctx.createGain(); g.gain.value = 0; g.connect(this.bus);
+      const ag = ctx.createGain(); ag.connect(this.bus);            // Arpeggiator-Tor
+      const g = ctx.createGain(); g.gain.value = 0; g.connect(ag);
       const a = ctx.createOscillator(), b = ctx.createOscillator();
       a.connect(g); b.connect(g); a.start(); b.start();
-      this.voices.push({a, b, g, from:220, to:220, t0:0, t1:0});
+      this.voices.push({a, b, g, ag, from:220, to:220, t0:0, t1:0});
     }
     this.verbSize = -1; this.verbTimer = 0;
     this.apply(p, true);
@@ -864,6 +926,9 @@ class Engine{
     this.fb.gain.setTargetAtTime(p.delFb, t, 0.02);
     this.delWet.gain.setTargetAtTime(p.delMix, t, 0.02);
     this.master.gain.setTargetAtTime(p.volume * 0.8, t, 0.02);
+    this.drumBus.gain.setTargetAtTime((p.beatVol ?? 0.7) * 0.9, t, 0.02);
+    if (!(p.pump > 0)) this.pump.gain.setTargetAtTime(1, t, 0.02);
+    if (!p.arp || p.arp === 'off') this.voices.forEach(v => v.ag.gain.setTargetAtTime(1, t, 0.01));
     // Hall-Impuls erst neu berechnen, wenn der Regler ruht (sonst Aussetzer beim Ziehen)
     if (Math.abs(this.verbSize - p.verbSize) > 0.01){
       clearTimeout(this.verbTimer);
@@ -896,7 +961,7 @@ class Engine{
     v.from = cur; v.to = f; v.t0 = t; v.t1 = t + Math.max(glide, 0.0001);
   }
   // offs: Versatz je Stimme in Sekunden, glides: Gleitzeit je Stimme (beides optional)
-  play(voiced, t, offs, glides){
+  play(voiced, t, offs, glides, boff){
     const p = this.p, was = this.gate;
     const all = voiced.notes.slice();
     const strum = p.strum || 0;
@@ -907,12 +972,70 @@ class Engine{
       this.glideVoice(this.voices[i], mtof(all[j]), ti, gl);
     }
     const glide = was ? p.glide : 0;
-    this.glideVoice(this.voices[MAX_VOICES], mtof(voiced.bass), t, glide);
+    this.glideVoice(this.voices[MAX_VOICES], mtof(voiced.bass), was ? t + (boff || 0) : t, glide);
     if (!this.gate || p.retrig) this.gateOn(t);
   }
   moveVoice(i, note, t, glide){ this.glideVoice(this.voices[i], mtof(note), t, this.gate ? glide : 0); }
+  filterEnv(t, dec){
+    const p = this.p; if (!(p.fenv > 0)) return;
+    const f = this.filter.frequency;
+    ramp(f, t);
+    f.setValueAtTime(Math.min(16000, p.cutoff * (1 + p.fenv * 7)), t);
+    f.setTargetAtTime(p.cutoff, t + 0.005, Math.max(0.02, dec / 3));
+  }
+  // Arpeggiator: nur eine Stimme gleichzeitig offen
+  arpStep(t, step, dur){
+    const p = this.p, n = p.voices, period = Math.max(1, 2 * n - 2);
+    let idx;
+    if (p.arp === 'down') idx = n - 1 - (step % n);
+    else if (p.arp === 'updown'){ const s = step % period; idx = s < n ? s : period - s; }
+    else if (p.arp === 'random') idx = Math.floor(Math.random() * n);
+    else idx = step % n;
+    for (let i = 0; i < MAX_VOICES; i++){
+      const ag = this.voices[i].ag.gain;
+      ramp(ag, t);
+      if (i === idx){ ag.setTargetAtTime(1, t, 0.003); ag.setTargetAtTime(0, t + dur * 0.55, dur * 0.18); }
+      else ag.setTargetAtTime(0, t, 0.004);
+    }
+    this.filterEnv(t, dur * 1.5);
+  }
+  // Pumpen: auf jedem Schlag kurz leiser, dann wieder auf
+  pumpBeat(t, spb){
+    const p = this.p; if (!(p.pump > 0)) return;
+    const g = this.pump.gain;
+    ramp(g, t);
+    g.linearRampToValueAtTime(1 - p.pump * 0.85, t + 0.012);
+    g.setTargetAtTime(1, t + 0.03, spb * 0.17);
+  }
+  drum(kind, t, vel){
+    const c = this.ctx, out = this.drumBus;
+    const env = (node, peak, dec) => { const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0008, t + dec); node.connect(g); g.connect(out); return g; };
+    const noise = (dec) => { const n = c.createBufferSource(); n.buffer = this.noise; n.start(t, Math.random() * 0.5); n.stop(t + dec + 0.05); return n; };
+    if (kind === 'k'){                       // Kick
+      const o = c.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.11);
+      env(o, 1.0 * vel, 0.42); o.start(t); o.stop(t + 0.5);
+      const cl = c.createOscillator(); cl.frequency.value = 1200; env(cl, 0.08 * vel, 0.012); cl.start(t); cl.stop(t + 0.03);
+    } else if (kind === 's'){                // Snare
+      const n = noise(0.2), bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 0.7; n.connect(bp); env(bp, 0.55 * vel, 0.19);
+      const o = c.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(200, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.08); env(o, 0.35 * vel, 0.1); o.start(t); o.stop(t + 0.15);
+    } else if (kind === 'c'){                // Clap
+      const n = noise(0.25), bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 1.1; n.connect(bp);
+      const g = c.createGain(); bp.connect(g); g.connect(out);
+      g.gain.setValueAtTime(0, t);
+      [0, 0.011, 0.022].forEach(d => { g.gain.linearRampToValueAtTime(0.6 * vel, t + d + 0.001); g.gain.exponentialRampToValueAtTime(0.05, t + d + 0.009); });
+      g.gain.linearRampToValueAtTime(0.45 * vel, t + 0.034); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22);
+    } else if (kind === 'h' || kind === 'o'){ // Hi-Hat zu / offen
+      const dec = kind === 'h' ? 0.045 : 0.28;
+      const n = noise(dec), hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7500; n.connect(hp); env(hp, (kind === 'h' ? 0.22 : 0.18) * vel, dec);
+    } else if (kind === 'r'){                // Rimshot
+      const o = c.createOscillator(); o.type = 'square'; o.frequency.value = 820;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; o.connect(bp); env(bp, 0.25 * vel, 0.035); o.start(t); o.stop(t + 0.06);
+    }
+  }
   gateOn(t){
     const p = this.p, g = this.amp.gain;
+    this.filterEnv(t, p.decay);
     ramp(g, t);
     g.linearRampToValueAtTime(1, t + Math.max(0.003, p.attack));
     g.setTargetAtTime(p.sustain, t + Math.max(0.003, p.attack), Math.max(0.01, p.decay / 3));
@@ -929,7 +1052,8 @@ class Engine{
 /* ---------- Parameter, Presets ---------- */
 const DEFAULTS = {wave:'sawtooth', detune:10, voices:4, octave:0, glide:0.35, attack:0.08, decay:0.6, sustain:0.8, release:1.2,
   retrig:false, cutoff:1800, res:3, lfoRate:0.25, lfoDepth:0.15, verbMix:0.35, verbSize:3, delMix:0.12, delFb:0.35, delBeats:0.75,
-  bass:true, bassLevel:0.6, volume:0.7, strum:0, stagger:0.4, motion:0.5, bpm:90, latency:'playback'};
+  bass:true, bassLevel:0.6, volume:0.7, strum:0, stagger:0.15, motion:0.15, fenv:0, pump:0, arp:'off', arpRate:4,
+  bpm:90, latency:'playback', beat:'off', beatVol:0.7};
 const PRESETS = {
   'Weiches Pad': {},
   'Glas-Keys': {wave:'triangle', detune:4, glide:0.15, attack:0.005, decay:0.9, sustain:0.35, release:1.4, retrig:true, cutoff:5000, res:1, lfoDepth:0, verbMix:0.3, delMix:0.18},
@@ -937,6 +1061,11 @@ const PRESETS = {
   'Orgel': {wave:'square', detune:3, glide:0.08, attack:0.01, decay:0.2, sustain:1, release:0.15, cutoff:3200, res:0.8, lfoRate:5.5, lfoDepth:0.04, verbMix:0.2, delMix:0},
   'Dunkler Drone': {wave:'sawtooth', detune:22, voices:6, octave:-1, glide:1.2, attack:1.5, sustain:1, release:3, cutoff:700, res:6, lfoRate:0.08, lfoDepth:0.45, verbMix:0.6, verbSize:5, delMix:0.2, delFb:0.5},
   'Pluck': {wave:'sawtooth', detune:6, glide:0.05, attack:0.002, decay:0.35, sustain:0, release:0.4, retrig:true, cutoff:2400, res:4, lfoDepth:0, verbMix:0.3, delMix:0.25, delBeats:0.5},
+  // Progressive House (Pluck mit Filter-Hüllkurve, Supersaw, Arpeggio, pumpende Pads)
+  'Prog-House: Pluck': {wave:'sawtooth', detune:12, glide:0.04, attack:0.002, decay:0.28, sustain:0.12, release:0.35, retrig:true, cutoff:650, res:7, fenv:0.75, lfoDepth:0, verbMix:0.32, verbSize:2.5, delMix:0.3, delFb:0.42, delBeats:0.75, pump:0.55, stagger:0, motion:0},
+  'Prog-House: Supersaw': {wave:'sawtooth', detune:30, voices:5, glide:0.12, attack:0.02, decay:0.5, sustain:0.85, release:0.6, cutoff:3800, res:1.2, fenv:0.2, lfoDepth:0.05, verbMix:0.38, delMix:0.15, delBeats:0.75, pump:0.65, stagger:0, motion:0},
+  'Prog-House: Arp': {wave:'sawtooth', detune:8, glide:0.03, attack:0.005, decay:0.3, sustain:0.9, release:0.4, cutoff:1100, res:6, fenv:0.6, lfoDepth:0, arp:'updown', arpRate:4, verbMix:0.3, delMix:0.32, delFb:0.45, delBeats:0.75, pump:0.35, stagger:0, motion:0},
+  'Prog-House: Pad': {wave:'sawtooth', detune:20, voices:5, glide:0.4, attack:0.9, decay:1, sustain:0.9, release:2.2, cutoff:1300, res:2, lfoRate:0.12, lfoDepth:0.25, verbMix:0.5, verbSize:4.5, delMix:0.1, pump:0.45, stagger:0.1, motion:0.1},
 };
 const KNOBS = [
   ['Stimmen'],
@@ -962,6 +1091,9 @@ const KNOBS = [
   ['delMix','Echo',0,0.8,0.01, v=>Math.round(v*100)+'%'],
   ['delFb','Echo-Rückkopplung',0,0.9,0.01, v=>Math.round(v*100)+'%'],
   ['delBeats','Echo-Zeit',0.25,2,0.25, v=>({0.25:'1/16',0.5:'1/8',0.75:'1/8 punkt.',1:'1/4',1.5:'1/4 punkt.',2:'1/2'}[v]||v+' Schl.')],
+  ['Progressive House'],
+  ['fenv','Filter-Hüllkurve',0,1,0.01, v=>Math.round(v*100)+'%'],
+  ['pump','Pumpen (Sidechain)',0,1,0.01, v=>Math.round(v*100)+'%'],
   ['Loop-Bewegung'],
   ['stagger','Versatz der Stimmen',0,1,0.01, v=>Math.round(v*100)+'%'],
   ['motion','Bewegung im Akkord',0,1,0.01, v=>Math.round(v*100)+'%'],
@@ -973,6 +1105,7 @@ const STORE = 'chordwave.v1';
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch(e){}
 const P = Object.assign({}, DEFAULTS, saved.p || {});
+if (!P.v2){ P.stagger = DEFAULTS.stagger; P.motion = DEFAULTS.motion; P.v2 = true; }   // ruhigere Grundeinstellung
 let steps = Array.isArray(saved.steps) ? saved.steps : [];
 let loopSeed = typeof saved.seed === 'number' ? saved.seed : Math.floor(Math.random() * 1e6);
 let barsPref = saved.bars || 4;
@@ -1009,7 +1142,7 @@ const held = new Set();
 const marks = [];   // Akkordwechsel für die Linien-Anzeige
 function mark(t, root, type){ marks.push({t, name: chordName(root, type)}); if (marks.length > 40) marks.shift(); }
 function playChord(root, type, noRecord, when){
-  ensureAudio();
+  ensureAudio(); fxEnsure();
   curRoot = root; curType = type;
   const v = leader.next(root, type, P);
   const t = when || ctx.currentTime + 0.005;
@@ -1136,10 +1269,11 @@ function buildLoopEvents(st, p){
       const offs = notes.map((nt, i) => {
         if (x.offs && x.offs[i] != null) return Math.min(x.offs[i], L * 0.95);
         if (x.sync) return 0;
-        return chg[i] && prevN ? srand(kk, i) * p.stagger * Math.min(L, 4) * 0.5 : 0;
+        return chg[i] && prevN ? Math.round(srand(kk, i) * p.stagger * Math.min(L, 4) * 0.5 * 4) / 4 : 0;   // auf Viertel-Schläge
       });
       const glides = notes.map((nt, i) => p.glide * (0.7 + 0.6 * srand(kk, i + 20)));
-      out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:notes.slice(), bass:v.bass, offs, glides, L, chg});
+      const bass = x.bass != null ? x.bass : v.bass, boff = x.boff != null ? Math.min(x.boff, L * 0.95) : 0;
+      out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:notes.slice(), bass, boff, offs, glides, L, chg});
       lastNotes = notes.slice();
       const doMove = x.move === true ? L >= 2 : x.move === false ? false : (p.motion > 0 && L >= 4 && srand(kk, 99) < p.motion);
       if (doMove){
@@ -1156,10 +1290,30 @@ function buildLoopEvents(st, p){
 function playEvent(eng, ev, t, spb, live){
   if (ev.kind === 'off'){ eng.gateOff(t); if (live) uiAt(t, () => markPlaying(ev.k)); return; }
   if (ev.kind === 'move'){ eng.moveVoice(ev.i, ev.note, t, ev.glide); if (live && leader.prev && leader.prev.length > ev.i) leader.prev[ev.i] = ev.note; return; }
-  eng.play({notes:ev.notes, bass:ev.bass}, t, ev.offs.map(o => o * spb), ev.glides);
+  eng.play({notes:ev.notes, bass:ev.bass}, t, ev.offs.map(o => o * spb), ev.glides, (ev.boff || 0) * spb);
   if (live){
     leader.prev = ev.notes.slice(); mark(t, ev.root, ev.type);
     uiAt(t, () => { if (looping){ showChord(ev.root, ev.type, ev.notes); markPlaying(ev.k); } });
+  }
+}
+let fxNext = 0, fxStep = 0, fxTimer = 0;
+function fxEnsure(){ if (!fxTimer) fxTimer = setInterval(fxTick, 25); }
+function fxTick(){
+  if (!ctx || !engine) return;
+  const now = ctx.currentTime, sd = 60 / P.bpm / 4;
+  if (!(looping || engine.gate)){ fxNext = 0; return; }
+  if (!fxNext || fxNext < now - 0.2){ fxNext = now + 0.02; fxStep = 0; }
+  let guard = 0;
+  while (fxNext < now + 0.12 && guard++ < 64){ fxSchedule(engine, fxStep, fxNext, sd, looping, engine.gate); fxNext += sd; fxStep++; }
+}
+// ein Sechzehntel-Schritt: Arpeggio, Pumpen, Beat
+function fxSchedule(eng, step, t, sd, withBeat, gateOn){
+  const p = eng.p;
+  if (p.arp && p.arp !== 'off' && gateOn){ const per = 4 / (p.arpRate || 4); if (step % per === 0) eng.arpStep(t, step / per, sd * per); }
+  if (p.pump > 0 && step % 4 === 0) eng.pumpBeat(t, sd * 4);
+  if (withBeat && p.beat && BEATS[p.beat]){
+    const pat = BEATS[p.beat], i = step % 16, sw = pat.swing && i % 2 === 1 ? pat.swing * sd : 0;
+    for (const [inst, str] of Object.entries(pat.parts)){ const c = str[i]; if (c && c !== '.') eng.drum(inst, t + sw, c === 'x' ? 1 : 0.6); }
   }
 }
 function uiAt(t, fn){ setTimeout(fn, Math.max(0, (t - ctx.currentTime) * 1000)); }
@@ -1265,6 +1419,7 @@ function startLoop(){
   ensureAudio();
   loopDirty = true; ensureEvents();
   looping = true; evIdx = 0; cycleSpb = 60 / P.bpm; cycleStart = ctx.currentTime + 0.08;
+  fxNext = cycleStart; fxStep = 0; fxEnsure();
   for (const id of ['playBtn','fPlay']) if (els[id]){ els[id].classList.add('on'); els[id].textContent = '❚❚'; }
   tick(); loopTimer = setInterval(tick, 25);
 }
@@ -1319,8 +1474,17 @@ async function exportWav(){
   const eng = new Engine(octx, P);
   const {events, beats} = buildLoopEvents(steps, P);
   const t0 = 0.02;
-  for (let k = 0; k < passes; k++) for (const ev of events) playEvent(eng, ev, t0 + (k * beats + ev.b) * spb, spb, false);
+  const gateIv = [];                                      // wann der Akkord klingt (für das Arpeggio)
+  for (let k = 0; k < passes; k++) for (const ev of events){
+    playEvent(eng, ev, t0 + (k * beats + ev.b) * spb, spb, false);
+    if (ev.kind === 'chord' || ev.kind === 'off') gateIv.push({t:(k * beats + ev.b) * spb, on: ev.kind === 'chord'});
+  }
   eng.gateOff(t0 + passes * beats * spb);
+  const sd = spb / 4, endB = passes * beats * 4;
+  for (let st = 0; st < endB; st++){
+    const tt = st * sd; let on = false; for (const g of gateIv) if (g.t <= tt + 1e-6) on = g.on;
+    fxSchedule(eng, st, t0 + tt, sd, true, on);
+  }
   const buf = await octx.startRendering();
   download(encodeWav(buf), 'chordwave-loop.wav');
   toast('WAV gespeichert.');
@@ -1354,10 +1518,18 @@ function exportMidi(){
     if (e.kind === 'move'){ acts.push({t:tk, v:e.i, n:e.note}); continue; }
     e.notes.forEach((n, v) => acts.push({t:Math.round(tk + e.offs[v] * PPQ), v, n}));
     for (let v = e.notes.length; v < MAX_VOICES; v++) acts.push({t:tk, v, n:null});
-    acts.push({t:tk, v:BASS, n: P.bass ? e.bass : null});
+    acts.push({t:Math.round(tk + (e.boff || 0) * PPQ), v:BASS, n: P.bass ? e.bass : null});
   }
   const end = passes * beats * PPQ;
   for (let v = 0; v <= BASS; v++) acts.push({t:end, v, n:null});
+  if (P.beat && BEATS[P.beat]){
+    const pat = BEATS[P.beat], st16 = PPQ / 4;
+    for (let st = 0; st < passes * beats * 4; st++){
+      const i = st % 16, sw = pat.swing && i % 2 ? Math.round(pat.swing * st16) : 0;
+      for (const [inst, str] of Object.entries(pat.parts)){ const c = str[i]; if (!c || c === '.') continue;
+        const tk = st * st16 + sw; ev.push({t:tk, d:[0x99, DRUM_MIDI[inst], c === 'x' ? 110 : 75], off:0}); ev.push({t:tk + st16 - 1, d:[0x89, DRUM_MIDI[inst], 0], off:1}); }
+    }
+  }
   acts.sort((a, b) => a.t - b.t);
   const cur = new Array(BASS + 1).fill(null), cnt = {};
   for (const a of acts){
@@ -1398,7 +1570,7 @@ function fitCanvas(cv){
 }
 function draw(){
   requestAnimationFrame(draw);
-  try { if (focusOn) drawFocus(); else { drawLines(); drawPiano(); } } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
+  try { if (detailK >= 0) drawDetail(); else if (focusOn) drawFocus(); else { drawLines(); drawPiano(); } } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
 }
 function drawLines(){
   const {g, w, h} = fitCanvas(els.scope);
@@ -1574,7 +1746,7 @@ function pianoHit(e){
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','latency','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -1672,6 +1844,8 @@ for (const k of KNOBS){
 }
 function syncUI(){
   for (const key in knobEls) knobEls[key].set(P[key]);
+  els.arp.value = P.arp || 'off'; els.arpRate.value = String(P.arpRate || 4);
+  els.beatVol.value = P.beatVol ?? 0.7; syncBeatSelects();
   els.latency.value = P.latency || 'playback';
   syncFront();
   els.wave.value = P.wave; els.bass.checked = P.bass; els.retrig.checked = P.retrig; els.bpm.value = P.bpm;
@@ -1714,7 +1888,7 @@ function syncFront(){
 const USTORE = 'chordwave.presets';
 let userPresets = {};
 try { userPresets = JSON.parse(localStorage.getItem(USTORE) || '{}') || {}; } catch(e){}
-const SOUND_KEYS = Object.keys(DEFAULTS).filter(k => k !== 'bpm' && k !== 'latency');
+const SOUND_KEYS = Object.keys(DEFAULTS).filter(k => !['bpm','latency','beat','beatVol'].includes(k));
 function soundOf(p){ const o = {}; SOUND_KEYS.forEach(k => o[k] = p[k]); return o; }
 function fillPresets(sel){
   els.preset.innerHTML = '';
@@ -1734,9 +1908,9 @@ function fillPresets(sel){
 }
 function loadPreset(v){
   const bpm = P.bpm;
-  const latency = P.latency, oct = P.octave;
-  if (v.startsWith('b:')) Object.assign(P, DEFAULTS, PRESETS[v.slice(2)], {bpm, latency});
-  else if (v.startsWith('u:')) Object.assign(P, DEFAULTS, userPresets[v.slice(2)], {bpm, latency});
+  const latency = P.latency, oct = P.octave, beat = P.beat, beatVol = P.beatVol;
+  if (v.startsWith('b:')) Object.assign(P, DEFAULTS, PRESETS[v.slice(2)], {bpm, latency, beat, beatVol});
+  else if (v.startsWith('u:')) Object.assign(P, DEFAULTS, userPresets[v.slice(2)], {bpm, latency, beat, beatVol});
   lastOctave = oct;
   syncUI(); changed('preset');
 }
@@ -1773,6 +1947,19 @@ els.soundResetBtn.addEventListener('click', () => {
 });
 els.knobs.addEventListener('input', () => { els.preset.value = ''; els.presetDelBtn.disabled = true; });
 els.wave.addEventListener('change', () => { P.wave = els.wave.value; els.preset.value = ''; changed(); });
+function fillBeatSelect(sel){
+  sel.innerHTML = '';
+  const o = document.createElement('option'); o.value = 'off'; o.textContent = 'kein Beat'; sel.append(o);
+  Object.keys(BEATS).forEach(n => { const q = document.createElement('option'); q.value = n; q.textContent = n + ' (' + BEATS[n].bpm + ')'; sel.append(q); });
+}
+function syncBeatSelects(){ for (const id of ['beatSel', 'fBeat']) if (els[id]) els[id].value = P.beat || 'off'; }
+function setBeat(v){ P.beat = v; syncBeatSelects(); changed(); if (v !== 'off' && !looping && !loopIsEmpty()) toast('Beat gewählt – ▶ startet Loop und Beat.'); }
+fillBeatSelect(els.beatSel);
+els.beatSel.addEventListener('change', () => setBeat(els.beatSel.value));
+els.beatVol.addEventListener('input', () => { P.beatVol = +els.beatVol.value; changed(); });
+els.beatTempo.addEventListener('click', () => { if (BEATS[P.beat]){ P.bpm = BEATS[P.beat].bpm; els.bpm.value = P.bpm; changed(); renderFocus(); toast('Tempo: ' + P.bpm + ' BPM'); } else toast('Erst ein Beat-Muster wählen.'); });
+els.arp.addEventListener('change', () => { P.arp = els.arp.value; els.preset.value = ''; changed(); });
+els.arpRate.addEventListener('change', () => { P.arpRate = +els.arpRate.value; els.preset.value = ''; changed(); });
 els.octDown.addEventListener('click', () => setOctave(P.octave - 1));
 els.octUp.addEventListener('click', () => setOctave(P.octave + 1));
 els.quickGlide.addEventListener('input', () => { P.glide = +els.quickGlide.value / 1000; knobEls.glide.set(P.glide); els.preset.value = ''; changed('glide'); });
@@ -1895,6 +2082,7 @@ function renderFocus(){
     const parts = same(h1, h2) ? [h1] : [h1, h2];
     parts.forEach(c => { const sp = document.createElement('span'); sp.className = 'half' + (c ? '' : ' empty2'); sp.textContent = nm(c); cell.append(sp); });
     const pr = document.createElement('i'); pr.className = 'prog'; cell.append(pr);
+    cell.addEventListener('dblclick', () => openDetail(stepAtBeat(b * 4)));
     cell.addEventListener('click', e => {
       const r = cell.getBoundingClientRect();
       focusCursor = b * 4 + (+els.fLen.value === 2 && e.clientX - r.left > r.width / 2 ? 2 : 0);
@@ -1909,7 +2097,8 @@ function renderFocus(){
   els.fBpm.textContent = P.bpm + ' BPM';
   const k = currentKey(); els.fKey.textContent = keyName(k);
   updateFocusStatus();
-  renderFocusRoots(); renderFocusTypes(); renderFocusSugs(); renderFocusVoice();
+  renderFocusRoots(); renderFocusTypes(); renderFocusSugs();
+  if (detailK >= 0) renderDetail();
 }
 // Vorschläge für die gewählte Stelle: Bezug ist der Akkord davor im Loop
 function renderFocusSugs(){
@@ -1959,17 +2148,25 @@ function renderFocusRoots(){
   });
   mk('♯', 'acc' + (focusArm === 1 ? ' armed' : ''), () => acc(1));
 }
+var focusMoreTypes = false;
 function renderFocusTypes(){
   if (!focusOn) return;
   els.fTypes.innerHTML = '';
+  const showAll = focusMoreTypes || curType >= BASIC_TYPES;
   CHORDS.forEach((c, i) => {
+    if (!showAll && i >= BASIC_TYPES) return;
     const b = document.createElement('button'); b.textContent = c.label === 'Dur' ? 'maj' : c.label === 'Moll' ? 'm' : c.label;
     if (i === curType) b.className = 'sel';
     b.addEventListener('pointerdown', e => { e.preventDefault(); typeDown(i); renderFocusTypes(); });
     els.fTypes.append(b);
   });
+  const m = document.createElement('button'); m.className = 'more'; m.textContent = showAll ? '− weniger' : '+ weitere Typen';
+  m.style.gridColumn = 'span 6';
+  m.addEventListener('click', () => { focusMoreTypes = !showAll; renderFocusTypes(); });
+  els.fTypes.append(m);
 }
 function setFocus(on){
+  if (!on && detailK >= 0){ els.detail.classList.remove('on'); detailK = -1; }
   focusOn = on; document.body.classList.toggle('focus', on);
   if (on){ if (!steps.length) focusCursor = 0; lastWrite = null; renderFocus(); }
   else renderSteps();
@@ -1995,10 +2192,9 @@ function drawFocus(){
     if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
     if (e.kind === 'move'){ if (e.i < n) lanes[e.i].push({t:e.b, to:e.note, g:e.glide / spb}); continue; }
     for (let j = 0; j < n; j++){ const jj = Math.min(j, e.notes.length - 1); lanes[j].push({t:e.b + e.offs[jj], to:e.notes[jj], g:e.glides[jj] / spb}); }
-    lanes[n].push({t:e.b, to:e.bass, g:P.glide / spb});
+    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:P.glide / spb});
   }
   lanes.forEach(l => l.sort((a, b) => a.t - b.t));
-  focusHandles = [];
   const at = (l, b) => {
     let i = -1; for (let k = 0; k < l.length; k++) if (l[k].t <= b) i = k;
     const c = i >= 0 ? l[i] : l[l.length - 1], prev = i > 0 ? l[i - 1] : l[l.length - 1];
@@ -2024,26 +2220,6 @@ function drawFocus(){
     g.strokeStyle = col; g.globalAlpha = j === n ? 0.12 : 0.18; g.lineWidth = j === n ? 6 : 8; g.stroke();
     g.globalAlpha = j === n ? 0.6 : 1; g.lineWidth = j === n ? 2 : 2.5; g.stroke(); g.globalAlpha = 1;
   });
-  // Griffe: Einsatzpunkte der Stimmen (seitlich ziehen = später/früher einsetzen)
-  const selK = stepAtBeat(focusCursor);
-  for (const e of lv.events){
-    if (e.kind !== 'chord') continue;
-    for (let j = 0; j < n; j++){
-      const jj = Math.min(j, e.notes.length - 1);
-      if (jj !== j) continue;
-      const xs = steps[e.k] && steps[e.k].x, own = xs && xs.offs && xs.offs[jj] != null;
-      if (!e.chg[jj] && !own && e.k !== stepAtBeat(focusCursor)) continue;      // ruhende Stimmen ohne Griff
-      const hx = X(e.b + e.offs[jj]), hy = Y(e.notes[jj]);
-      const sel = e.k === selK, drag = focusDrag && focusDrag.k === e.k && focusDrag.j === jj;
-      focusHandles.push({k:e.k, j:jj, x:hx, y:hy, b:e.b, L:e.L});
-      const hot = focusVoiceHot === jj && sel;
-      g.beginPath(); g.arc(hx, hy, drag ? 10 : hot ? 9 : sel ? 7.5 : 5, 0, Math.PI * 2);
-      g.fillStyle = '#07060c'; g.fill();
-      g.lineWidth = drag ? 3 : 2; g.strokeStyle = VOICE_COLORS[j]; g.globalAlpha = sel || drag ? 1 : 0.55; g.stroke(); g.globalAlpha = 1;
-      if (drag){ g.fillStyle = '#ece9f7'; g.font = '600 11px system-ui'; g.textBaseline = 'bottom';
-        g.fillText('+' + fmtBeats(e.offs[jj]), Math.min(hx + 8, w - 60), hy - 8); g.textBaseline = 'top'; }
-    }
-  }
   // Abspielposition
   if (looping){
     const pos = ((loopPos() % lv.beats) + lv.beats) % lv.beats, x = X(pos);
@@ -2059,119 +2235,200 @@ function drawFocus(){
     updateFocusStatus();
   }
 }
-// ---- Stimmen-Einsätze bearbeiten ----
-var focusHandles = [], focusDrag = null;
+// ---- Takt-Detailansicht: Stränge einzeln bearbeiten ----
+var detailK = -1, detailHandles = [], detailDrag = null, focusVoiceHot = -1;
 const fmtBeats = b => (Math.round(b * 4) / 4).toString().replace('.', ',') + ' Schl.';
 function stepAtBeat(beat){ let a = 0; for (let k = 0; k < steps.length; k++){ if (beat < a + steps[k].beats) return k; a += steps[k].beats; } return -1; }
 function stepStart(k){ let a = 0; for (let i = 0; i < k; i++) a += steps[i].beats; return a; }
 function stepX(k){ const s = steps[k]; if (!s) return null; if (!s.x) s.x = {}; return s.x; }
-function editStep(k, fn){ if (!steps[k] || steps[k].root == null) return; pushUndo(); fn(stepX(k)); markLoopDirty(); save(); renderFocusVoice(); }
-function renderFocusVoice(){
-  if (!focusOn) return;
-  const k = stepAtBeat(focusCursor), s = steps[k];
+function editStep(k, fn){ if (!steps[k] || steps[k].root == null) return; pushUndo(); fn(stepX(k)); markLoopDirty(); save(); renderDetail(); }
+['detail','dGraph','dTitle','dPrev','dNext','dHear','dClose','fDetail','fBeat','fVoiceInfo','fvSync','fvDice','fvMove','fvReset','fvStagger','fvMotion','fvGrid','fvFree']
+  .forEach(id => els[id] = document.getElementById(id));
+fillBeatSelect(els.fBeat); syncBeatSelects();
+els.fBeat.addEventListener('change', () => setBeat(els.fBeat.value));
+function chordSteps(){ const out = []; steps.forEach((s, k) => { if (s.root != null) out.push(k); }); return out; }
+function openDetail(k){
+  if (k == null || k < 0 || !steps[k] || steps[k].root == null){
+    const cs = chordSteps(); if (!cs.length){ toast('Erst einen Akkord in einen Takt setzen.'); return; }
+    k = cs.find(i => stepStart(i) >= focusCursor) ?? cs[0];
+  }
+  detailK = k; els.detail.classList.add('on'); renderDetail();
+}
+function closeDetail(){ els.detail.classList.remove('on'); detailK = -1; detailDrag = null; renderFocus(); }
+function detailEvent(){ return ensureEvents().events.find(e => e.kind === 'chord' && e.k === detailK); }
+function bassCands(s, b0){ const pcs = new Set(chordPcs(s.root, s.type)), out = [];
+  for (let m = b0 - 12; m <= b0 + 12; m++) if (els.fvFree.checked || pcs.has(((m % 12) + 12) % 12) || m === b0) out.push(m); return out; }
+function voiceCands(s, n0){ const pcs = new Set(chordPcs(s.root, s.type)), out = [];
+  for (let m = n0 - 13; m <= n0 + 13; m++) if (els.fvFree.checked || pcs.has(((m % 12) + 12) % 12) || m === n0) out.push(m); return out; }
+function renderDetail(){
+  if (detailK < 0) return;
+  const s = steps[detailK]; if (!s || s.root == null){ closeDetail(); return; }
+  const start = stepStart(detailK), bar = Math.floor(start / 4) + 1;
+  els.dTitle.innerHTML = ''; els.dTitle.append(chordName(s.root, s.type));
+  const sm = document.createElement('small'); sm.textContent = `Takt ${bar}${start % 4 ? ' (2. Hälfte)' : ''} · ${s.beats} Schläge`; els.dTitle.append(sm);
+  const cs = chordSteps(), pos = cs.indexOf(detailK);
+  els.dPrev.disabled = pos <= 0; els.dNext.disabled = pos < 0 || pos >= cs.length - 1;
   els.fvStagger.value = P.stagger; els.fvMotion.value = P.motion;
-  const has = s && s.root != null;
-  ['fvSync','fvDice','fvMove','fvReset'].forEach(id => els[id].disabled = !has);
-  if (!has){ els.fVoiceInfo.innerHTML = 'Stimmen: erst einen Akkord in den Takt setzen.'; els.fvSync.classList.remove('on'); els.fvMove.textContent = '↝ Bewegung: auto'; els.fvGrid.innerHTML = ''; return; }
-  const x = s.x || {}, custom = x.offs && Object.keys(x.offs).length;
-  els.fVoiceInfo.innerHTML = '';
-  const b = document.createElement('b'); b.textContent = chordName(s.root, s.type);
-  const customP = x.pitch && Object.keys(x.pitch).length;
-  els.fVoiceInfo.append('Stimmen bei ', b, (custom || customP) ? ' – eigene Einstellungen (lila).' : '.', ' Mit den Reglern Höhe und Einsatz jeder Stimme ändern – oder die Punkte in der Grafik ziehen.');
-  els.fvSync.classList.toggle('on', !!x.sync && !custom);
+  const x = s.x || {}, custom = (x.offs && Object.keys(x.offs).length) || (x.pitch && Object.keys(x.pitch).length) || x.bass != null || x.boff != null;
+  els.fVoiceInfo.textContent = custom ? 'Eigene Einstellungen sind lila markiert.' : 'Noch automatisch – ändere Höhe oder Einsatz einzelner Stimmen.';
+  els.fvSync.classList.toggle('on', !!x.sync && !(x.offs && Object.keys(x.offs).length));
   els.fvMove.textContent = '↝ Bewegung: ' + (x.move === true ? 'an' : x.move === false ? 'aus' : 'auto');
   els.fvMove.classList.toggle('on', x.move != null);
-  renderVoiceGrid(k);
+  renderVoiceGrid();
 }
-['fVoiceInfo','fvSync','fvDice','fvMove','fvReset','fvStagger','fvMotion','fvGrid','fvFree'].forEach(id => els[id] = document.getElementById(id));
-var focusVoiceHot = -1;
-try { els.fvFree.checked = localStorage.getItem('chordwave.free') === '1'; } catch(e){}
-els.fvFree.addEventListener('change', () => { try { localStorage.setItem('chordwave.free', els.fvFree.checked ? '1' : '0'); } catch(e){} renderFocusVoice(); });
-let previewTimer = 0;
-function previewChord(ev, notes){
-  ensureAudio();
-  if (looping) return;                                  // während der Loop läuft, hört man es beim nächsten Durchlauf
-  engine.play({notes, bass:ev.bass}, ctx.currentTime + 0.01);
-  sounding = true;
-  clearTimeout(previewTimer);
-  if (!latch) previewTimer = setTimeout(() => release(), 900);
-}
-function renderVoiceGrid(k){
+function renderVoiceGrid(){
   const grid = els.fvGrid; grid.innerHTML = '';
-  const s = steps[k]; if (!s || s.root == null) return;
-  const ev = ensureEvents().events.find(e => e.kind === 'chord' && e.k === k); if (!ev) return;
+  const k = detailK, s = steps[k], ev = detailEvent(); if (!s || !ev) return;
   for (const h of ['Stimme', 'Höhe', 'Einsatz', '']){ const d = document.createElement('div'); d.className = 'h'; d.textContent = h; grid.append(d); }
   const pcs = new Set(chordPcs(s.root, s.type)), x = s.x || {};
   const nameOf = n => (pcs.has(((n % 12) + 12) % 12) ? toneName(s.root, s.type, n) : noteDisp(n)) + (Math.floor(n / 12) - 1);
-  ev.notes.forEach((n0, j) => {
-    const own = (x.pitch && x.pitch[j] != null) || (x.offs && x.offs[j] != null);
-    // Höhe: Akkordtöne (oder alle Halbtöne) im Umkreis von gut einer Oktave
-    const cand = []; for (let m = n0 - 13; m <= n0 + 13; m++) if (els.fvFree.checked || pcs.has(((m % 12) + 12) % 12) || m === n0) cand.push(m);
-    const nm = document.createElement('div'); nm.className = 'nm' + (own ? ' own' : '');
-    const dot = document.createElement('i'); dot.style.background = VOICE_COLORS[j];
-    const lab = document.createElement('span'); lab.textContent = nameOf(n0); nm.append(dot, lab);
-    const hi = document.createElement('input'); hi.type = 'range'; hi.min = 0; hi.max = cand.length - 1; hi.step = 1; hi.value = cand.indexOf(n0);
-    hi.title = 'Tonhöhe dieser Stimme';
-    const en = document.createElement('input'); en.type = 'range'; en.min = 0; en.max = Math.max(0.25, Math.floor(ev.L * 0.95 * 4) / 4); en.step = 0.25; en.value = ev.offs[j];
-    en.title = 'Wann diese Stimme nach dem Akkordwechsel einsetzt';
-    const val = document.createElement('div'); val.className = 'val'; val.textContent = '+' + fmtBeats(ev.offs[j]).replace(' Schl.', '');
-    let undoPushed = false;
-    const begin = () => { if (!undoPushed){ pushUndo(); undoPushed = true; } focusVoiceHot = j; };
-    hi.addEventListener('input', () => {
-      begin();
-      const m = cand[+hi.value], xs = stepX(k); if (!xs.pitch) xs.pitch = {};
-      xs.pitch[j] = m; markLoopDirty(); lab.textContent = nameOf(m); nm.classList.add('own');
-      const notes = ev.notes.slice(); notes[j] = m; previewChord(ev, notes);
-    });
-    en.addEventListener('input', () => {
-      begin();
-      const xs = stepX(k); if (!xs.offs) xs.offs = {};
-      xs.offs[j] = +en.value; delete xs.sync; markLoopDirty();
-      val.textContent = '+' + fmtBeats(+en.value).replace(' Schl.', ''); nm.classList.add('own');
-    });
-    const done = () => { undoPushed = false; focusVoiceHot = -1; save(); renderFocusVoice(); };
+  const rows = ev.notes.map((n0, j) => ({j, n0, off:ev.offs[j], col:VOICE_COLORS[j], own:(x.pitch && x.pitch[j] != null) || (x.offs && x.offs[j] != null), cand:voiceCands(s, n0)}));
+  rows.reverse();                                          // oben die höchste Stimme …
+  if (P.bass) rows.push({j:'bass', n0:ev.bass, off:ev.boff || 0, col:BASS_COLOR, own:x.bass != null || x.boff != null, cand:bassCands(s, ev.bass)});   // … unten der Bass
+  rows.forEach(r => {
+    const nm = document.createElement('div'); nm.className = 'nm' + (r.own ? ' own' : '');
+    const dot = document.createElement('i'); dot.style.background = r.col;
+    const lab = document.createElement('span'); lab.textContent = (r.j === 'bass' ? 'Bass ' : '') + nameOf(r.n0); nm.append(dot, lab);
+    const hi = document.createElement('input'); hi.type = 'range'; hi.min = 0; hi.max = r.cand.length - 1; hi.step = 1; hi.value = r.cand.indexOf(r.n0);
+    const en = document.createElement('input'); en.type = 'range'; en.min = 0; en.max = Math.max(0.25, Math.floor(ev.L * 0.95 * 4) / 4); en.step = 0.25; en.value = r.off;
+    const val = document.createElement('div'); val.className = 'val'; val.textContent = '+' + fmtBeats(r.off).replace(' Schl.', '');
+    let pushed = false; const begin = () => { if (!pushed){ pushUndo(); pushed = true; } };
+    hi.addEventListener('input', () => { begin(); const m = r.cand[+hi.value]; setVoicePitch(r.j, m); lab.textContent = (r.j === 'bass' ? 'Bass ' : '') + nameOf(m); nm.classList.add('own'); hearDetail(); });
+    en.addEventListener('input', () => { begin(); setVoiceOff(r.j, +en.value); val.textContent = '+' + fmtBeats(+en.value).replace(' Schl.', ''); nm.classList.add('own'); });
+    const done = () => { pushed = false; save(); renderDetail(); };
     hi.addEventListener('change', done); en.addEventListener('change', done);
     grid.append(nm, hi, en, val);
   });
 }
-els.fvSync.addEventListener('click', () => editStep(stepAtBeat(focusCursor), x => { x.sync = !(x.sync && !(x.offs && Object.keys(x.offs).length)); delete x.offs; }));
-// Hinweis: ↺ entfernt auch eigene Tonhöhen
-els.fvDice.addEventListener('click', () => editStep(stepAtBeat(focusCursor), x => { x.seed = 1 + Math.floor(Math.random() * 9999); delete x.offs; delete x.sync; }));
-els.fvMove.addEventListener('click', () => editStep(stepAtBeat(focusCursor), x => { x.move = x.move == null ? true : x.move === true ? false : undefined; if (x.move === undefined) delete x.move; }));
-els.fvReset.addEventListener('click', () => editStep(stepAtBeat(focusCursor), x => { for (const key of Object.keys(x)) delete x[key]; }));
+function setVoicePitch(j, m){ const x = stepX(detailK); if (j === 'bass') x.bass = m; else { if (!x.pitch) x.pitch = {}; x.pitch[j] = m; } markLoopDirty(); }
+function setVoiceOff(j, o){ const x = stepX(detailK); if (j === 'bass') x.boff = o; else { if (!x.offs) x.offs = {}; x.offs[j] = o; delete x.sync; } markLoopDirty(); }
+let hearTimer = 0;
+function hearDetail(){
+  const ev = (markLoopDirty(), detailEvent()); if (!ev || looping) return;
+  ensureAudio(); fxEnsure();
+  engine.play({notes:ev.notes, bass:ev.bass}, ctx.currentTime + 0.01);
+  sounding = true; clearTimeout(hearTimer);
+  if (!latch) hearTimer = setTimeout(() => release(), 1200);
+}
+// Detail-Grafik: dieser Takt vergrößert (mit einem Schlag davor/danach), Punkte ziehbar
+function drawDetail(){
+  const {g, w, h} = fitCanvas(els.dGraph);
+  g.clearRect(0, 0, w, h);
+  const lv = ensureEvents(), ev = detailEvent(); if (!ev) return;
+  const spb = 60 / P.bpm, b0 = ev.b, b1 = ev.b + ev.L, from = Math.max(0, b0 - 1), to = Math.min(lv.beats, b1 + 1);
+  const X = b => 34 + (b - from) / (to - from) * (w - 90);
+  const n = P.voices, lanes = Array.from({length:n + 1}, () => []);
+  for (const e of lv.events){
+    if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
+    if (e.kind === 'move'){ if (e.i < n) lanes[e.i].push({t:e.b, to:e.note, g:e.glide / spb}); continue; }
+    for (let j = 0; j < n; j++){ const jj = Math.min(j, e.notes.length - 1); lanes[j].push({t:e.b + e.offs[jj], to:e.notes[jj], g:e.glides[jj] / spb}); }
+    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:P.glide / spb});
+  }
+  lanes.forEach(l => l.sort((a, b) => a.t - b.t));
+  const at = (l, b) => {
+    let i = -1; for (let k = 0; k < l.length; k++) if (l[k].t <= b) i = k;
+    const c = i >= 0 ? l[i] : l[l.length - 1], prev = i > 0 ? l[i - 1] : l[l.length - 1];
+    if (!c || c.off) return null;
+    const since = i >= 0 ? b - c.t : b + lv.beats - c.t;
+    if (prev && !prev.off && since < c.g) return prev.to + (c.to - prev.to) * (since / c.g);
+    return c.to;
+  };
+  let lo = Infinity, hi = -Infinity;
+  lanes.forEach((l, j) => { if (j === n && !P.bass) return; for (let b = from; b <= to; b += 0.25){ const m = at(l, b); if (m != null){ lo = Math.min(lo, m); hi = Math.max(hi, m); } } });
+  lo -= 2; hi += 2;
+  const top = 22, bot = h - 14, Y = m => bot - (m - lo) / (hi - lo) * (bot - top);
+  // Raster: Akkordtöne hell, Taktgrenzen, Schläge
+  const pcs = new Set(chordPcs(ev.root, ev.type));
+  for (let m = Math.ceil(lo); m <= Math.floor(hi); m++){
+    if (pcs.has(((m % 12) + 12) % 12)){ g.fillStyle = 'rgba(124,240,208,0.07)'; g.fillRect(X(b0), Y(m) - 1, X(b1) - X(b0), 2); }
+    if (m % 12 === 0){ g.fillStyle = 'rgba(236,233,247,0.35)'; g.font = '10px system-ui'; g.textBaseline = 'middle'; g.fillText('C' + (m / 12 - 1), 4, Y(m)); }
+  }
+  g.fillStyle = 'rgba(124,240,208,0.05)'; g.fillRect(X(b0), 0, X(b1) - X(b0), h);
+  for (let b = Math.ceil(from); b <= to; b++){ g.fillStyle = b === b0 || b === b1 ? 'rgba(236,233,247,.35)' : 'rgba(236,233,247,.08)'; g.fillRect(Math.round(X(b)), 0, 1, h); }
+  g.font = '600 11px system-ui'; g.textBaseline = 'top'; g.fillStyle = '#7cf0d0'; g.fillText(chordName(ev.root, ev.type), X(b0) + 4, 4);
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  lanes.forEach((l, j) => {
+    if (j === n && !P.bass) return;
+    const col = j === n ? BASS_COLOR : VOICE_COLORS[j];
+    g.beginPath(); let open = false;
+    for (let px = X(from); px <= X(to); px += 2){
+      const b = from + (px - X(from)) / (X(to) - X(from)) * (to - from), m = at(l, b);
+      if (m == null){ open = false; continue; }
+      open ? g.lineTo(px, Y(m)) : g.moveTo(px, Y(m)); open = true;
+    }
+    g.strokeStyle = col; g.globalAlpha = 0.2; g.lineWidth = 10; g.stroke(); g.globalAlpha = 1; g.lineWidth = 3; g.stroke();
+  });
+  // Griffe für diesen Akkord
+  detailHandles = [];
+  const pcsName = m => (pcs.has(((m % 12) + 12) % 12) ? toneName(ev.root, ev.type, m) : noteDisp(m)) + (Math.floor(m / 12) - 1);
+  const items = ev.notes.map((m, j) => ({j, m, off:ev.offs[j], col:VOICE_COLORS[j]}));
+  if (P.bass) items.push({j:'bass', m:ev.bass, off:ev.boff || 0, col:BASS_COLOR});
+  for (const it of items){
+    const hx = X(b0 + it.off), hy = Y(it.m), drag = detailDrag && detailDrag.j === it.j;
+    detailHandles.push({...it, x:hx, y:hy});
+    g.beginPath(); g.arc(hx, hy, drag ? 13 : 10, 0, Math.PI * 2); g.fillStyle = '#07060c'; g.fill(); g.lineWidth = 3; g.strokeStyle = it.col; g.stroke();
+    const txt = pcsName(it.m) + (it.off ? '  +' + fmtBeats(it.off).replace(' Schl.', '') : '');
+    g.font = '600 11px system-ui'; g.textBaseline = 'middle';
+    const tw = g.measureText(txt).width, tx = Math.min(hx + 15, w - tw - 8), ty = hy - 15;
+    g.fillStyle = 'rgba(7,6,12,.85)'; g.beginPath(); g.roundRect ? g.roundRect(tx - 4, ty - 8, tw + 8, 16, 5) : g.rect(tx - 4, ty - 8, tw + 8, 16); g.fill();
+    g.fillStyle = it.col; g.fillText(txt, tx, ty);
+  }
+}
+els.dGraph.addEventListener('pointerdown', e => {
+  const r = els.dGraph.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  let best = null, bd = 40;
+  for (const hd of detailHandles){ const d = Math.hypot(hd.x - px, hd.y - py); if (d < bd){ bd = d; best = hd; } }
+  if (!best) return;
+  e.preventDefault(); els.dGraph.setPointerCapture?.(e.pointerId);
+  pushUndo();
+  const s = steps[detailK], ev = detailEvent();
+  detailDrag = {j:best.j, id:e.pointerId, x0:px, y0:py, off0:best.off, m0:best.m, mode:null, moved:false,
+    cand: best.j === 'bass' ? bassCands(s, best.m) : voiceCands(s, best.m), L:ev.L};
+});
+els.dGraph.addEventListener('pointermove', e => {
+  const d = detailDrag; if (!d || e.pointerId !== d.id) return;
+  const r = els.dGraph.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  const dx = px - d.x0, dy = py - d.y0;
+  if (!d.mode && Math.hypot(dx, dy) > 8) d.mode = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';   // Richtung einrasten
+  if (!d.mode) return;
+  d.moved = true;
+  const lv = ensureEvents(), ev = detailEvent(); if (!ev) return;
+  const from = Math.max(0, ev.b - 1), to = Math.min(lv.beats, ev.b + ev.L + 1), pxPerBeat = (r.width - 90) / (to - from);
+  if (d.mode === 'x'){
+    const off = Math.max(0, Math.min(Math.floor(d.L * 0.95 * 4) / 4, Math.round((d.off0 + dx / pxPerBeat) * 4) / 4));
+    setVoiceOff(d.j, off);
+  } else {
+    const steps1 = Math.round(-dy / 14);                    // ca. 14 px pro Stufe
+    const i0 = d.cand.indexOf(d.m0), i = Math.max(0, Math.min(d.cand.length - 1, i0 + steps1));
+    const m = d.cand[i];
+    if (m !== d.lastM){ d.lastM = m; setVoicePitch(d.j, m); hearDetail(); }
+  }
+});
+const endDetailDrag = e => {
+  const d = detailDrag; if (!d || (e && e.pointerId !== d.id)) return;
+  detailDrag = null;
+  if (!d.moved){ undoStack.pop(); updUndo(); } else { save(); renderDetail(); }
+};
+els.dGraph.addEventListener('pointerup', endDetailDrag); els.dGraph.addEventListener('pointercancel', endDetailDrag);
+els.fDetail.addEventListener('click', () => openDetail(stepAtBeat(focusCursor)));
+els.dClose.addEventListener('click', closeDetail);
+els.dPrev.addEventListener('click', () => { const cs = chordSteps(), i = cs.indexOf(detailK); if (i > 0){ detailK = cs[i - 1]; renderDetail(); } });
+els.dNext.addEventListener('click', () => { const cs = chordSteps(), i = cs.indexOf(detailK); if (i >= 0 && i < cs.length - 1){ detailK = cs[i + 1]; renderDetail(); } });
+els.dHear.addEventListener('click', hearDetail);
+try { els.fvFree.checked = localStorage.getItem('chordwave.free') === '1'; } catch(e){}
+els.fvFree.addEventListener('change', () => { try { localStorage.setItem('chordwave.free', els.fvFree.checked ? '1' : '0'); } catch(e){} renderDetail(); });
+els.fvSync.addEventListener('click', () => editStep(detailK, x => { x.sync = !(x.sync && !(x.offs && Object.keys(x.offs).length)); delete x.offs; delete x.boff; }));
+els.fvDice.addEventListener('click', () => editStep(detailK, x => { x.seed = 1 + Math.floor(Math.random() * 9999); delete x.offs; delete x.sync; }));
+els.fvMove.addEventListener('click', () => editStep(detailK, x => { x.move = x.move == null ? true : x.move === true ? false : undefined; if (x.move === undefined) delete x.move; }));
+els.fvReset.addEventListener('click', () => editStep(detailK, x => { for (const key of Object.keys(x)) delete x[key]; }));
 els.fvStagger.addEventListener('input', () => { P.stagger = +els.fvStagger.value; if (knobEls.stagger) knobEls.stagger.set(P.stagger); changed('stagger'); });
 els.fvMotion.addEventListener('input', () => { P.motion = +els.fvMotion.value; if (knobEls.motion) knobEls.motion.set(P.motion); changed('motion'); });
-els.fGraph.addEventListener('pointerdown', e => {
-  const r = els.fGraph.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-  let best = null, bd = 34;
-  for (const hd of focusHandles){ const d = Math.hypot(hd.x - px, hd.y - py); if (d < bd){ bd = d; best = hd; } }
-  if (!best) return;
-  e.preventDefault(); els.fGraph.setPointerCapture?.(e.pointerId);
-  pushUndo();
-  focusDrag = {...best, id:e.pointerId, x0:px, moved:false};
-  // Takt dieses Akkords auswählen
-  focusCursor = stepStart(best.k); focusCursor -= focusCursor % +els.fLen.value; lastWrite = null;
-  renderFocus();
+// Hauptgrafik antippen = Details dieses Takts
+els.fGraph.addEventListener('click', e => {
+  const r = els.fGraph.getBoundingClientRect(), beats = Math.max(4, barCount() * 4);
+  const beat = (e.clientX - r.left - 6) / (r.width - 12) * beats;
+  openDetail(stepAtBeat(Math.max(0, Math.min(beats - 0.01, beat))));
 });
-els.fGraph.addEventListener('pointermove', e => {
-  if (!focusDrag || e.pointerId !== focusDrag.id) return;
-  const r = els.fGraph.getBoundingClientRect(), px = e.clientX - r.left;
-  if (Math.abs(px - focusDrag.x0) > 3) focusDrag.moved = true;
-  const beats = Math.max(4, barCount() * 4);
-  const beat = (px - 6) / (r.width - 12) * beats;
-  let off = Math.round((beat - focusDrag.b) * 4) / 4;           // auf Viertel-Schläge einrasten
-  off = Math.max(0, Math.min(focusDrag.L * 0.95, off));
-  const x = stepX(focusDrag.k); if (!x.offs) x.offs = {};
-  if (x.offs[focusDrag.j] !== off){ x.offs[focusDrag.j] = off; delete x.sync; markLoopDirty(); }
-});
-const endDrag = e => {
-  if (!focusDrag || (e && e.pointerId !== focusDrag.id)) return;
-  const d = focusDrag; focusDrag = null;
-  if (!d.moved) undoStack.pop(), updUndo();
-  else { save(); toast(`Stimme ${d.j + 1} setzt ${fmtBeats(steps[d.k].x.offs[d.j])} nach dem Akkordwechsel ein.`); }
-  renderFocusVoice();
-};
-els.fGraph.addEventListener('pointerup', endDrag); els.fGraph.addEventListener('pointercancel', endDrag);
 
 els.focusBtn.addEventListener('click', () => setFocus(true));
 els.fExit.addEventListener('click', () => setFocus(false));
