@@ -69,6 +69,7 @@ header #latchBtn{height:38px;padding:0 10px;font-size:14px}
 .pad.sugd{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6),0 0 10px rgba(124,240,208,.25)}
 .pad.sugd .deg{color:var(--accent)}
 .pad.fit{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6)}
+html[lang=en] .pad.fit::after{content:"fits"}
 .pad.fit::after{content:"passt";position:absolute;left:6px;top:3px;font:600 9px system-ui;color:var(--accent)}
 .steps{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;height:40px;align-items:stretch;scrollbar-width:none}
 .steps::-webkit-scrollbar{display:none}
@@ -190,6 +191,8 @@ body.focus #focus{display:block}
 #sheet .grp{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 #sheet .grp .lbl{margin-bottom:2px}
 #sheet .row button{flex:1 1 auto}
+#sheet .about summary{cursor:pointer;list-style:none}
+#sheet .about p{margin:6px 0}
 #recLive.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
 #recBadge{display:none;position:fixed;top:max(8px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:9;background:var(--warn);color:#0b0a12;
   font-weight:700;font-size:13px;padding:5px 12px;border-radius:20px;cursor:pointer}
@@ -311,6 +314,7 @@ body.focus #focus{display:block}
   <section class="tab" id="tab-sound">
     <div class="box">
       <div class="row">
+        <label>Sprache <select id="langSel"><option value="de">Deutsch</option><option value="en">English</option></select></label>
         <label>Preset <select id="preset"></select></label>
       </div>
       <div class="row">
@@ -336,7 +340,7 @@ body.focus #focus{display:block}
         <label><input type="checkbox" id="retrig"> Neu anschlagen</label>
       </div>
       <div class="knobs" id="knobs"></div>
-      <p class="hint">PC-Tastatur: Grundton mit den Buchstaben <b>C D E F G A B</b> (auch <b>H</b> = B). Für ♯ dazu <b>Shift</b> oder <b>X</b> halten, für ♭ <b>Z</b>/<b>Y</b> halten – oder X/Z direkt danach antippen. Akkordtyp mit <b>1–0</b> und den zwei Tasten rechts daneben. <b>Q</b>/<b>W</b> Oktave, <b>Leertaste</b> nochmal spielen bzw. stoppen.</p>
+      <p class="hint" data-en="PC keyboard: root with the letters <b>C D E F G A B</b> (also <b>H</b> = B). For ♯ hold <b>Shift</b> or <b>X</b>, for ♭ hold <b>Z</b>/<b>Y</b> – or tap X/Z right after the letter. Chord type with <b>1–0</b> and the two keys to the right. <b>Q</b>/<b>W</b> octave, <b>Space</b> play again / stop.">PC-Tastatur: Grundton mit den Buchstaben <b>C D E F G A B</b> (auch <b>H</b> = B). Für ♯ dazu <b>Shift</b> oder <b>X</b> halten, für ♭ <b>Z</b>/<b>Y</b> halten – oder X/Z direkt danach antippen. Akkordtyp mit <b>1–0</b> und den zwei Tasten rechts daneben. <b>Q</b>/<b>W</b> Oktave, <b>Leertaste</b> nochmal spielen bzw. stoppen.</p>
     </div>
   </section>
 </main>
@@ -384,7 +388,7 @@ body.focus #focus{display:block}
     <button id="dClose" title="schließen">✕</button>
   </div>
   <canvas id="dGraph"></canvas>
-  <p class="hint"><b>Schräge Linien</b> = Gleiten: die Stimme rutscht vom vorigen Ton zum neuen (Dauer = Gleitzeit, abschaltbar mit „〰 Gleiten“). <b>Einsatz</b> = wann sie losrutscht. Anschwellen betrifft nur die Lautstärke. Punkt ziehen: seitlich = Einsatz, hoch/runter = Tonhöhe.</p>
+  <p class="hint" data-en="<b>Sloped lines</b> = glide: the voice slides from the previous note to the new one (duration = glide time, can be turned off with “〰 Glide”). <b>Entry</b> = when it starts sliding. Attack only affects volume. Drag a dot: sideways = entry, up/down = pitch."><b>Schräge Linien</b> = Gleiten: die Stimme rutscht vom vorigen Ton zum neuen (Dauer = Gleitzeit, abschaltbar mit „〰 Gleiten“). <b>Einsatz</b> = wann sie losrutscht. Anschwellen betrifft nur die Lautstärke. Punkt ziehen: seitlich = Einsatz, hoch/runter = Tonhöhe.</p>
   <div class="fvoice" id="fVoice">
     <div class="t" id="fVoiceInfo"></div>
     <div class="row">
@@ -430,6 +434,14 @@ body.focus #focus{display:block}
     <div class="row"><select id="loopList" style="flex:1"></select><button id="loopLoad">Laden</button><button id="loopDel">Löschen</button></div>
     <p class="hint">Gespeichert werden Akkorde, Tempo und Sound – lokal in diesem Browser.</p>
   </div>
+  <details class="grp about">
+    <summary class="lbl">Über &amp; Lizenzen</summary>
+    <div class="hint" data-en="<p><b>Chordwave</b> – chord synthesizer with gliding voices.<br>© 2026 G3kk0Git. All rights reserved.<br>Copying, modifying, redistributing or building on this app or its source code requires prior written permission.</p><p><b>Privacy:</b> Chordwave does not collect any personal data. There are no accounts, no tracking and no ads. Loops, sounds and settings are stored only locally on your device. Exported files stay with you.</p><p><b>Third-party software</b> (Android app only): Capacitor, © Ionic, MIT license – https://capacitorjs.com. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction … THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND.</p>">
+      <p><b>Chordwave</b> – Akkord-Synthesizer mit gleitenden Stimmen.<br>© 2026 G3kk0Git. Alle Rechte vorbehalten.<br>Kopieren, Verändern, Weiterverbreiten oder Weiterentwickeln dieser App oder ihres Quellcodes nur mit vorheriger schriftlicher Erlaubnis.</p>
+      <p><b>Datenschutz:</b> Chordwave erhebt keine personenbezogenen Daten. Es gibt keine Konten, kein Tracking und keine Werbung. Loops, Sounds und Einstellungen werden nur lokal auf deinem Gerät gespeichert. Exportierte Dateien bleiben bei dir.</p>
+      <p><b>Fremdsoftware</b> (nur Android-App): Capacitor, © Ionic, MIT-Lizenz – https://capacitorjs.com. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction … THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND.</p>
+    </div>
+  </details>
  </div>
 </div>
 <div id="recBadge" title="Aufnahme stoppen">⏺ REC 0:00</div>
@@ -1531,7 +1543,17 @@ function stopLoop(){
 }
 
 /* ---------- Export ---------- */
+const isNativeApp = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+function blobToBase64(blob){ return new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = fail; r.readAsDataURL(blob); }); }
+async function nativeShare(blob, name){
+  const {Filesystem, Share} = window.Capacitor.Plugins;
+  const data = await blobToBase64(blob);
+  const res = await Filesystem.writeFile({path: name, data, directory: 'CACHE'});
+  try { await Share.share({title: name, files: [res.uri]}); }
+  catch(e){ if (!/cancel/i.test(String(e && e.message))) await Share.share({title: name, url: res.uri}); }
+}
 function download(blob, name){
+  if (isNativeApp()){ toast('Datei wird geteilt …'); nativeShare(blob, name).catch(e => toast('Fehler: ' + (e && e.message || e))); return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.append(a); a.click(); a.remove();
@@ -1837,7 +1859,7 @@ let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
 
 function padPress(btn, onDown, onUp){
-  btn.addEventListener('pointerdown', e => { e.preventDefault(); btn.setPointerCapture?.(e.pointerId); btn.classList.add('hit'); onDown(); });
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); try { btn.setPointerCapture?.(e.pointerId); } catch(_){} btn.classList.add('hit'); onDown(); });
   const up = () => { if (!btn.classList.contains('hit')) return; btn.classList.remove('hit'); onUp && onUp(); };
   btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up);
 }
@@ -2108,7 +2130,7 @@ window.addEventListener('pagehide', saveNow);
 KEYS.forEach((k, i) => { const o = document.createElement('option'); o.value = i; o.textContent = keyName(k); els.keySel.append(o); });
 els.keySel.addEventListener('change', () => { keyFixed = els.keySel.value === 'auto' ? null : KEYS[+els.keySel.value]; updateHarmony(); });
 // Generator
-Object.keys(STYLES).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.genStyle.append(o); });
+Object.keys(STYLES).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; els.genStyle.append(o); });
 function applyStyleKit(name){
   const kit = STYLE_KIT[name]; if (!kit) return;
   fillPresets('b:' + kit.preset); loadPreset('b:' + kit.preset);
@@ -2670,6 +2692,166 @@ installBtn.addEventListener('click', async () => {
   else if (isIOS) toast('In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.');
   else toast('Im Browser-Menü ⋮ „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.');
 });
+
+
+/* ---------- Sprache: Deutsch / English ----------
+   Die Oberfläche ist auf Deutsch geschrieben; für Englisch werden alle sichtbaren Texte
+   (auch später erzeugte, z. B. Hinweise und Dialoge) über dieses Wörterbuch übersetzt. */
+const EN = {
+  // Kopf, Tabs, Allgemein
+  'Halten':'Hold','Akkorde':'Chords','Loop':'Loop','Sound':'Sound','Spielt':'Playing','Tippe einen Grundton':'Tap a root note',
+  'Oktave':'Octave','Gleiten':'Glide','passt':'fits','jetzt:':'now:','hier:':'here:','Tonart: auto':'Key: auto','Tonart':'Key',
+  'Dur':'maj','Moll':'min','⛶ Fokus':'⛶ Focus','Fokus':'Focus','Pause':'Rest','sofort':'now','Stimme':'Voice','Höhe':'Pitch','Einsatz':'Entry',
+  'Loop leer – ● drücken und Akkorde spielen':'Loop empty – press ● and play chords',
+  // Titel (Tooltips)
+  'Als App installieren':'Install as app','Speichern, Export, Audio-Aufnahme':'Save, export, audio recording',
+  'Aufnahme: jeder gespielte Akkord wird an den Loop angehängt':'Record: every chord you play is added to the loop',
+  'Loop abspielen':'Play loop','Alles stoppen (Leertaste)':'Stop everything (space)','Akkord klingt weiter, bis du einen neuen spielst':'Chord keeps sounding until you play a new one',
+  'Taste antippen = Grundton':'Tap a key = root note','Oktave tiefer (Q)':'Octave down (Q)','Oktave höher (W)':'Octave up (W)',
+  'Fokus-Modus: Loop Takt für Takt bauen':'Focus mode: build the loop bar by bar','Fokus-Modus verlassen':'Leave focus mode',
+  'Anzahl Takte':'Number of bars','Länge eines neuen Akkords':'Length of a new chord','Abfolge für alle Takte erzeugen (Stil wie im Loop-Tab)':'Generate a progression for all bars (style as in the Loop tab)',
+  'Stimmen dieses Takts im Detail bearbeiten':'Edit the voices of this bar in detail','voriger Takt':'previous bar','nächster Takt':'next bar','Akkord anhören':'Listen to chord','schließen':'close',
+  'Alle Stimmen wechseln gleichzeitig':'All voices change together','Neue zufällige Einsätze für diesen Takt':'New random entries for this bar',
+  'Bewegung innerhalb des Akkords: automatisch / an / aus':'Movement inside the chord: auto / on / off','Gleiten in diesen Akkord an/aus':'Glide into this chord on/off',
+  'Eigene Einstellungen dieses Takts entfernen':'Remove custom settings of this bar','Aufnahme stoppen':'Stop recording','Beat':'Beat',
+  'tiefer':'lower','höher':'higher','früher':'earlier','später':'later',
+  // Loop-Tab
+  'Tempo':'Tempo','BPM':'BPM','Takte':'Bars','Neue Akkorde':'New chords','1 Schlag':'1 beat','2 Schläge':'2 beats','1 Takt':'1 bar','2 Takte':'2 bars','½ Takt':'½ bar',
+  '+ Pause anhängen':'+ Add rest','Loop leeren':'Clear loop','↺ Zurücksetzen':'↺ Reset','Muster':'Pattern','Lautstärke':'Volume','kein Beat':'no beat',
+  'Tempo des Beats übernehmen':'Use the beat’s tempo','Der Beat läuft mit, wenn der Loop spielt, und ist im WAV- und MIDI-Export enthalten.':'The beat plays along with the loop and is included in WAV and MIDI export.',
+  'Generator':'Generator','Dauer':'Length','Stil':'Style','aktuelle':'current','zufällig':'random','Sound, Beat und Tempo passend zum Stil':'Sound, beat and tempo to match the style',
+  '✨ Abfolge erzeugen':'✨ Generate progression','↶ Rückgängig':'↶ Undo','✨ Erzeugen':'✨ Generate',
+  'Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab.':'Replaces the loop with a new progression of the chosen length (at the current tempo) and plays it.',
+  'Export':'Export','Durchläufe':'Passes','⬇ WAV':'⬇ WAV','⬇ MIDI':'⬇ MIDI',
+  '● drücken und im Tab „Akkorde“ spielen – jeder Akkord wird angehängt. Tippe oben auf einen Akkord im Loop, um ihn zu bearbeiten.':'Press ● and play in the “Chords” tab – every chord is added. Tap a chord in the loop at the top to edit it.',
+  'Tippe oben auf einen Akkord im Loop, um seine Länge zu ändern oder ihn zu löschen.':'Tap a chord in the loop at the top to change its length or delete it.',
+  'Der Loop ist noch leer.':'The loop is still empty.','Löschen':'Delete',
+  // Sound-Tab
+  'Sprache':'Language','Preset':'Preset','💾 Speichern':'💾 Save','Welle':'Wave','Säge':'Saw','Rechteck':'Square','Dreieck':'Triangle','Sinus':'Sine',
+  'Arpeggiator':'Arpeggiator','aus':'off','aufwärts':'up','abwärts':'down','auf & ab':'up & down','Audio':'Audio','stabil (empfohlen)':'stable (recommended)','ausgewogen':'balanced','schnell (kann knistern)':'fast (may crackle)',
+  'Bass':'Bass','Neu anschlagen':'Retrigger','Eingebaut':'Built-in','Eigene':'Custom','— geändert —':'— modified —',
+  'Stimmen':'Voices','Gleitzeit':'Glide time','Strum':'Strum','Verstimmung':'Detune','Hüllkurve':'Envelope','Anschwellen':'Attack','Abfall':'Decay','Haltepegel':'Sustain','Ausklang':'Release',
+  'Filter':'Filter','Resonanz':'Resonance','LFO Tempo':'LFO rate','LFO Tiefe':'LFO depth','Effekte':'Effects','Hall':'Reverb','Raumgröße':'Room size','Echo':'Echo','Echo-Rückkopplung':'Echo feedback','Echo-Zeit':'Echo time',
+  'Progressive House':'Progressive House','Filter-Hüllkurve':'Filter envelope','Pumpen (Sidechain)':'Pumping (sidechain)','Loop-Bewegung':'Loop movement','Versatz der Stimmen':'Voice offset','Bewegung im Akkord':'Movement in chord',
+  'Weiches Pad':'Soft Pad','Glas-Keys':'Glass Keys','Analog-Strings':'Analog Strings','Orgel':'Organ','Dunkler Drone':'Dark Drone',
+  'Melancholisch':'Melancholic','Episch':'Epic','Überraschend':'Surprising','Pop':'Pop','Jazz':'Jazz','Lo-Fi':'Lo-Fi','Ambient':'Ambient',
+  // Fokus
+  'danach weiter':'then next bar','🔍 Takt-Details':'🔍 Bar details','+ weitere Typen':'+ more types','− weniger':'− fewer',
+  'Buchstabe oder Vorschlag setzt den Akkord, Typ/♭/♯ ändern ihn. Nächsten Takt oben antippen.':'A letter or suggestion sets the chord, type/♭/♯ change it. Tap the next bar at the top.',
+  // Detail
+  'Eigene Einstellungen sind lila markiert.':'Custom settings are marked purple.','Noch automatisch – ändere Höhe oder Einsatz einzelner Stimmen.':'Still automatic – change pitch or entry of single voices.',
+  '⇉ Gleichzeitig':'⇉ Together','🎲 Neu würfeln':'🎲 Re-roll','Höhe auch zwischen den Akkordtönen (halbtonweise)':'Pitch also between chord tones (semitones)','Für alle Takte':'For all bars',
+  'Versatz':'Offset','Bewegung':'Movement','↺':'↺',
+  // Speichern-Menü
+  'Speichern & Export':'Save & export','Loop exportieren':'Export loop','⬇ WAV (Audio)':'⬇ WAV (audio)','⬇ MIDI (Noten)':'⬇ MIDI (notes)',
+  'Berechnet den Loop sauber mit dem aktuellen Sound – inklusive der einzeln wechselnden Stimmen.':'Renders the loop cleanly with the current sound – including the individually moving voices.',
+  'Live aufnehmen':'Record live','⏺ Audio-Aufnahme starten':'⏺ Start audio recording','⏹ Aufnahme stoppen & als WAV speichern':'⏹ Stop recording & save as WAV',
+  'Nimmt alles auf, was du ab jetzt hörst (live gespielt oder Loop), und speichert es beim Stoppen als WAV.':'Records everything you hear from now on (live or loop) and saves it as WAV when you stop.',
+  'Loops speichern':'Save loops','💾 Aktuellen Loop speichern …':'💾 Save current loop …','Laden':'Load','– noch keine gespeichert –':'– none saved yet –',
+  'Gespeichert werden Akkorde, Tempo und Sound – lokal in diesem Browser.':'Chords, tempo and sound are saved – locally in this browser.',
+  // Hinweise und Dialoge
+  'Der Loop ist leer.':'The loop is empty.','Der Loop ist noch leer – erst Akkorde aufnehmen.':'The loop is still empty – record some chords first.',
+  'Aufnahme an: jeder Akkord wird angehängt.':'Recording on: every chord is added.','Aufnahme läuft – spiel los.':'Recording – start playing.',
+  'Dieser Browser kann keine Audio-Aufnahme.':'This browser cannot record audio.','Beat gewählt – ▶ startet Loop und Beat.':'Beat selected – ▶ starts loop and beat.',
+  'Erst ein Beat-Muster wählen.':'Choose a beat pattern first.','Erst einen Akkord in einen Takt setzen.':'Put a chord into a bar first.',
+  'Loop geleert (Rückgängig möglich).':'Loop cleared (undo possible).','Loop zurückgesetzt.':'Loop reset.','Sound zurückgesetzt.':'Sound reset.',
+  'MIDI gespeichert.':'MIDI saved.','WAV gespeichert.':'WAV saved.','WAV wird berechnet …':'Rendering WAV …','Zu lang für den Export (max. 10 Minuten).':'Too long to export (max. 10 minutes).',
+  'Speichern nicht möglich (privater Modus?)':'Saving not possible (private mode?)','Audio neu eingestellt – tippe einen Akkord.':'Audio reset – tap a chord.',
+  'Alle Sound-Regler auf Standard zurücksetzen?':'Reset all sound controls to default?','Loop leeren und Tempo, Akkordlänge, Export und Generator auf Standard setzen?':'Clear the loop and reset tempo, chord length, export and generator?',
+  'Loop wirklich leeren?':'Really clear the loop?','Name für deinen Sound:':'Name for your sound:','Name für diesen Loop:':'Name for this loop:','Mein Sound':'My sound',
+  'Chordwave ist installiert.':'Chordwave is installed.',
+  'Im Browser-Menü ⋮ „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.':'In the browser menu ⋮ choose “Install app” or “Add to home screen”.',
+  'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
+  'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
+  'Datei wird geteilt …':'Sharing file …',
+  'Leeren':'Clear','Takt':'Bar','Über & Lizenzen':'About & licenses',
+};
+// Texte mit Zahlen/Namen
+const EN_RX = [
+  [/^Spielt Takt (\d+) von (\d+)$/, 'Playing bar $1 of $2'],
+  [/^Takt (\d+)( \(2\. Hälfte\))? ausgewählt$/, (m, a, h) => `Bar ${a}${h ? ' (2nd half)' : ''} selected`],
+  [/^Takt (\d+)( \(2\. Hälfte\))? · (\d+) Schläge$/, (m, a, h, b) => `Bar ${a}${h ? ' (2nd half)' : ''} · ${b} beats`],
+  [/^(\d+) Takte$/, '$1 bars'], [/^(\d+) Schläge$/, '$1 beats'], [/^(\d+) Schlag$/, '$1 beat'],
+  [/^(\d+) Akkorde in (.+), (\d+:\d+) min$/, (m, n, k, t) => `${n} chords in ${keyEN(k)}, ${t} min`],
+  [/^Tonart: (.+?)( \(auto\))?$/, (m, k, a) => `Key: ${keyEN(k)}${a || ''}`],
+  [/^([A-G][♯♭#]?)-(Dur|Moll)$/, (m) => keyEN(m)],
+  [/^Loop „(.+)“ gespeichert\.$/, 'Loop “$1” saved.'], [/^Loop „(.+)“ geladen\.$/, 'Loop “$1” loaded.'], [/^Loop „(.+)“ löschen\?$/, 'Delete loop “$1”?'],
+  [/^Sound „(.+)“ gespeichert\.$/, 'Sound “$1” saved.'], [/^Sound „(.+)“ löschen\?$/, 'Delete sound “$1”?'],
+  [/^„(.+)“ gibt es schon\. Überschreiben\?$/, '“$1” already exists. Overwrite?'],
+  [/^Aufnahme gespeichert \((\d+) s\)\.$/, 'Recording saved ($1 s).'], [/^Aufnahme konnte nicht gespeichert werden: (.*)$/, 'Recording could not be saved: $1'],
+  [/^WAV-Export fehlgeschlagen: (.*)$/, 'WAV export failed: $1'], [/^Fehler: (.*)$/, 'Error: $1'],
+  [/^⏺ REC (\d+:\d+) – tippen zum Stoppen$/, '⏺ REC $1 – tap to stop'],
+  [/^(.+) \((\d+) Akkorde, (\d+) BPM\)$/, '$1 ($2 chords, $3 BPM)'],
+  [/^Tempo: (\d+) BPM$/, 'Tempo: $1 BPM'],
+  [/^↝ Bewegung: (auto|an|aus)$/, (m, v) => '↝ Movement: ' + {auto:'auto', an:'on', aus:'off'}[v]],
+  [/^〰 Gleiten: (an|aus)$/, (m, v) => '〰 Glide: ' + (v === 'an' ? 'on' : 'off')],
+  [/^Neo-Riemann ([PLR])$/, 'Neo-Riemann $1'],
+  [/^Prog-House: (.+)$/, 'Prog-House: $1'],
+  [/^(.+) \((\d+)\)$/, (m, n, b) => EN[n] ? `${EN[n]} (${b})` : m],
+];
+function keyEN(k){ const m = k.match(/^([A-G][♯♭#]?)-(Dur|Moll)$/); return m ? `${m[1]} ${m[2] === 'Dur' ? 'major' : 'minor'}` : k; }
+let LANG = 'de';
+try { LANG = localStorage.getItem('chordwave.lang') || ((navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en'); } catch(e){}
+function tr(str){
+  if (LANG !== 'en' || !str) return str;
+  const lead = str.match(/^\s*/)[0], trail = str.match(/\s*$/)[0], core = str.trim();
+  if (!core) return str;
+  if (EN[core] != null) return lead + EN[core] + trail;
+  for (const [rx, to] of EN_RX){ if (rx.test(core)) return lead + core.replace(rx, to) + trail; }
+  return str;
+}
+const ORIG = new WeakMap();      // Originaltext (Deutsch) je Knoten/Attribut
+function trNode(node){
+  if (node.nodeType === 3){
+    const p = node.parentNode; if (!p || p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE') return;
+    if (LANG === 'en'){
+      const de = node.nodeValue, en = tr(de);
+      if (en !== de){ ORIG.set(node, de); node.nodeValue = en; }
+    } else if (ORIG.has(node)){ node.nodeValue = ORIG.get(node); ORIG.delete(node); }
+    return;
+  }
+  if (node.nodeType !== 1) return;
+  for (const attr of ['title', 'label']){
+    if (!node.hasAttribute(attr)) continue;
+    const key = '__i18n_' + attr;
+    if (LANG === 'en'){ const de = node.getAttribute(attr), en = tr(de); if (en !== de){ node[key] = de; node.setAttribute(attr, en); } }
+    else if (node[key]){ node.setAttribute(attr, node[key]); node[key] = null; }
+  }
+  if (node.dataset && node.dataset.en != null){
+    if (node.dataset.de == null) node.dataset.de = node.innerHTML;
+    const want = LANG === 'en' ? node.dataset.en : node.dataset.de;
+    if (node.innerHTML !== want) node.innerHTML = want;
+    return;
+  }
+  for (const c of node.childNodes) trNode(c);
+}
+let i18nBusy = false;
+const i18nObs = new MutationObserver(muts => {
+  if (i18nBusy || LANG !== 'en') return;
+  i18nBusy = true;
+  for (const m of muts){
+    if (m.type === 'characterData') trNode(m.target);
+    else if (m.type === 'attributes') trNode(m.target);
+    else m.addedNodes.forEach(trNode);
+  }
+  i18nBusy = false;
+});
+function applyLang(){
+  document.documentElement.lang = LANG;
+  i18nBusy = true; trNode(document.body); i18nBusy = false;
+  if (els.langSel) els.langSel.value = LANG;
+}
+i18nObs.observe(document.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['title','label']});
+// Dialoge übersetzen
+{ const c0 = window.confirm.bind(window), p0 = window.prompt.bind(window);
+  window.confirm = m => c0(tr(m)); window.prompt = (m, d) => p0(tr(m), d == null ? d : tr(d)); }
+els.langSel = document.getElementById('langSel');
+els.langSel.addEventListener('change', () => {
+  LANG = els.langSel.value;
+  try { localStorage.setItem('chordwave.lang', LANG); } catch(e){}
+  applyLang(); renderSteps(); updateHarmony();
+});
+applyLang();
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>

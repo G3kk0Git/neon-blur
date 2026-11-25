@@ -1,0 +1,82 @@
+# Baut aus dem Ordner chordwave/ eine eigenständige Android-App (APK) mit Capacitor.
+# Ergebnis: unter "Actions" → jeweiliger Lauf → "Artifacts" → Chordwave-APK herunterladen.
+name: Android APK
+
+on:
+  push:
+    paths:
+      - 'chordwave/**'
+      - 'android-res/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Capacitor-Projekt anlegen
+        run: |
+          mkdir apk && cd apk
+          npm init -y > /dev/null
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6
+          mkdir www && cp -r ../chordwave/* www/
+          cat > capacitor.config.json <<'JSON'
+          {
+            "appId": "app.chordwave.synth",
+            "appName": "Chordwave",
+            "webDir": "www",
+            "android": { "backgroundColor": "#0b0a12" }
+          }
+          JSON
+          npx cap add android
+          npx cap sync android
+
+      - name: Icons, Startbild, Version und Signatur
+        run: |
+          RES=apk/android/app/src/main/res
+          cp -r android-res/res/* "$RES/"
+          find "$RES" -name 'splash.png' -exec cp android-res/splash.png {} \;
+          # fester Debug-Schlüssel: neue APKs lassen sich über die alte installieren (Daten bleiben erhalten)
+          cat >> apk/android/app/build.gradle <<'GRADLE'
+
+          android {
+              defaultConfig {
+                  versionCode Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+                  versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+              }
+              signingConfigs {
+                  debug {
+                      storeFile file(System.getenv("KS_PATH"))
+                      storePassword "android"
+                      keyAlias "androiddebugkey"
+                      keyPassword "android"
+                  }
+              }
+          }
+          GRADLE
+
+      - name: APK bauen
+        env:
+          KS_PATH: ${{ github.workspace }}/android-res/chordwave-debug.keystore
+        run: |
+          cd apk/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/Chordwave-1.0.${GITHUB_RUN_NUMBER}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Chordwave-APK
+          path: Chordwave-*.apk
+          retention-days: 30
