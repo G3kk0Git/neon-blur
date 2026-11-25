@@ -1736,7 +1736,7 @@ function drawLines(){
       g.globalAlpha = Math.min(1, f.a * 1.3 + 0.2);
       g.beginPath(); g.arc(xNow, py, i === MAX_VOICES ? 3.5 : 5, 0, Math.PI * 2); g.fillStyle = col; g.fill();
       const nm = Math.round(f.m[i]);
-      labels.push({y:py, col, text:NOTE_NAMES[((nm % 12) + 12) % 12] + (Math.floor(nm / 12) - 1)});
+      labels.push({y:py, col, text:(curRoot != null ? toneName(curRoot, curType, nm) : noteDisp(nm)) + (Math.floor(nm / 12) - 1)});
     }
     g.globalAlpha = 1; g.shadowBlur = 0;
   }
