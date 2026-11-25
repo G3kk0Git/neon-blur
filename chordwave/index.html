@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Chordwave</title>
+<title>Drifting Chords</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="favicon.png">
@@ -23,14 +23,14 @@ body{user-select:none;-webkit-user-select:none}
   padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
 header{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 header h1{font-size:18px;margin:0 auto 0 0;letter-spacing:.03em;font-weight:700;white-space:nowrap}
-header h1 span{color:var(--accent)}
+header h1 span{color:var(--accent2)}
 button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer;touch-action:manipulation}
 button:active{transform:scale(.97)}
 button.on{background:var(--accent);color:#0b0a12;border-color:var(--accent);font-weight:600}
 button.rec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
 header .ib{width:42px;height:38px;padding:0;font-size:16px}
 header #latchBtn{height:38px;padding:0 10px;font-size:14px}
-@media (max-width:400px){ header{gap:4px} header h1{font-size:16px} header .ib{width:36px} header #latchBtn{padding:0 7px;font-size:13px} }
+@media (max-width:400px){ header{gap:4px} header h1{font-size:15px} header .ib{width:36px} header #latchBtn{padding:0 7px;font-size:13px} }
 .viz{flex:0 0 auto;display:flex;flex-direction:column;background:#07060c;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .vtop{position:relative;height:clamp(120px,22dvh,240px)}
 #scope{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -206,7 +206,7 @@ body.focus #focus{display:block}
 <body>
 <div id="app">
 <header>
-  <h1>Chord<span>wave</span></h1>
+  <h1>Drifting<span>Chords</span></h1>
   <button id="installBtn" class="ib" title="Als App installieren" hidden>⤓</button>
   <button id="saveBtn" class="ib save" title="Speichern, Export, Audio-Aufnahme">💾</button>
   <button id="recBtn" class="rec ib" title="Aufnahme: jeder gespielte Akkord wird an den Loop angehängt">●</button>
@@ -436,9 +436,9 @@ body.focus #focus{display:block}
   </div>
   <details class="grp about">
     <summary class="lbl">Über &amp; Lizenzen</summary>
-    <div class="hint" data-en="<p><b>Chordwave</b> – chord synthesizer with gliding voices.<br>© 2026 G3kk0Git. All rights reserved.<br>Copying, modifying, redistributing or building on this app or its source code requires prior written permission.</p><p><b>Privacy:</b> Chordwave does not collect any personal data. There are no accounts, no tracking and no ads. Loops, sounds and settings are stored only locally on your device. Exported files stay with you.</p><p><b>Third-party software</b> (Android app only): Capacitor, © Ionic, MIT license – https://capacitorjs.com. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction … THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND.</p>">
-      <p><b>Chordwave</b> – Akkord-Synthesizer mit gleitenden Stimmen.<br>© 2026 G3kk0Git. Alle Rechte vorbehalten.<br>Kopieren, Verändern, Weiterverbreiten oder Weiterentwickeln dieser App oder ihres Quellcodes nur mit vorheriger schriftlicher Erlaubnis.</p>
-      <p><b>Datenschutz:</b> Chordwave erhebt keine personenbezogenen Daten. Es gibt keine Konten, kein Tracking und keine Werbung. Loops, Sounds und Einstellungen werden nur lokal auf deinem Gerät gespeichert. Exportierte Dateien bleiben bei dir.</p>
+    <div class="hint" data-en="<p><b>Drifting Chords</b> – <i>Harmony in endless motion.</i><br>A chord synthesizer with gliding voices.<br>© 2026 G3kk0Git. All rights reserved.<br>Copying, modifying, redistributing or building on this app or its source code requires prior written permission.</p><p><b>Privacy:</b> Drifting Chords does not collect any personal data. There are no accounts, no tracking and no ads. Loops, sounds and settings are stored only locally on your device. Exported files stay with you.</p><p><b>Third-party software</b> (Android app only): Capacitor, © Ionic, MIT license – https://capacitorjs.com. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction … THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND.</p>">
+      <p><b>Drifting Chords</b> – <i>Harmony in endless motion.</i><br>Akkord-Synthesizer mit gleitenden Stimmen.<br>© 2026 G3kk0Git. Alle Rechte vorbehalten.<br>Kopieren, Verändern, Weiterverbreiten oder Weiterentwickeln dieser App oder ihres Quellcodes nur mit vorheriger schriftlicher Erlaubnis.</p>
+      <p><b>Datenschutz:</b> Drifting Chords erhebt keine personenbezogenen Daten. Es gibt keine Konten, kein Tracking und keine Werbung. Loops, Sounds und Einstellungen werden nur lokal auf deinem Gerät gespeichert. Exportierte Dateien bleiben bei dir.</p>
       <p><b>Fremdsoftware</b> (nur Android-App): Capacitor, © Ionic, MIT-Lizenz – https://capacitorjs.com. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the Software without restriction … THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND.</p>
     </div>
   </details>
@@ -1584,7 +1584,7 @@ async function exportWav(){
     fxSchedule(eng, st, t0 + tt, sd, true, on);
   }
   const buf = await octx.startRendering();
-  download(encodeWav(buf), 'chordwave-loop.wav');
+  download(encodeWav(buf), 'drifting-chords-loop.wav');
   toast('WAV gespeichert.');
 }
 function encodeWav(buf){
@@ -1640,7 +1640,7 @@ function exportMidi(){
   const bytes = [];
   const vlq = n => { const out = [n & 0x7f]; while ((n >>= 7)) out.unshift((n & 0x7f) | 0x80); bytes.push(...out); };
   const tempo = Math.round(60000000 / P.bpm);
-  const name = 'Chordwave';
+  const name = 'Drifting Chords';
   vlq(0); bytes.push(0xff, 0x03, name.length, ...[...name].map(c => c.charCodeAt(0)));
   vlq(0); bytes.push(0xff, 0x51, 0x03, (tempo >> 16) & 255, (tempo >> 8) & 255, tempo & 255);
   vlq(0); bytes.push(0xff, 0x58, 0x04, 4, 2, 24, 8);
@@ -1650,7 +1650,7 @@ function exportMidi(){
   const head = [0x4d,0x54,0x68,0x64, 0,0,0,6, 0,0, 0,1, (PPQ >> 8) & 255, PPQ & 255];
   const L = bytes.length;
   const trk = [0x4d,0x54,0x72,0x6b, (L >>> 24) & 255, (L >> 16) & 255, (L >> 8) & 255, L & 255];
-  download(new Blob([new Uint8Array([...head, ...trk, ...bytes])], {type:'audio/midi'}), 'chordwave-loop.mid');
+  download(new Blob([new Uint8Array([...head, ...trk, ...bytes])], {type:'audio/midi'}), 'drifting-chords-loop.mid');
   toast('MIDI gespeichert.');
 }
 
@@ -2621,7 +2621,7 @@ function startLiveRec(){
     try {
       const blob = new Blob(chunks, {type: mr.mimeType || 'audio/webm'});
       const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
-      download(encodeWav(buf), 'chordwave-aufnahme.wav');
+      download(encodeWav(buf), 'drifting-chords-aufnahme.wav');
       toast('Aufnahme gespeichert (' + Math.round(buf.duration) + ' s).');
     } catch(e){ toast('Aufnahme konnte nicht gespeichert werden: ' + e.message); }
   };
@@ -2685,7 +2685,7 @@ const standalone = matchMedia('(display-mode: standalone)').matches || navigator
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const installBtn = document.getElementById('installBtn');
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (!standalone) installBtn.hidden = false; });
-window.addEventListener('appinstalled', () => { installBtn.hidden = true; installEvt = null; toast('Chordwave ist installiert.'); });
+window.addEventListener('appinstalled', () => { installBtn.hidden = true; installEvt = null; toast('Drifting Chords ist installiert.'); });
 if (isIOS && !standalone) installBtn.hidden = false;
 installBtn.addEventListener('click', async () => {
   if (installEvt){ installEvt.prompt(); const r = await installEvt.userChoice; if (r.outcome === 'accepted') installBtn.hidden = true; installEvt = null; }
@@ -2759,7 +2759,7 @@ const EN = {
   'Speichern nicht möglich (privater Modus?)':'Saving not possible (private mode?)','Audio neu eingestellt – tippe einen Akkord.':'Audio reset – tap a chord.',
   'Alle Sound-Regler auf Standard zurücksetzen?':'Reset all sound controls to default?','Loop leeren und Tempo, Akkordlänge, Export und Generator auf Standard setzen?':'Clear the loop and reset tempo, chord length, export and generator?',
   'Loop wirklich leeren?':'Really clear the loop?','Name für deinen Sound:':'Name for your sound:','Name für diesen Loop:':'Name for this loop:','Mein Sound':'My sound',
-  'Chordwave ist installiert.':'Chordwave is installed.',
+  'Drifting Chords ist installiert.':'Drifting Chords is installed.',
   'Im Browser-Menü ⋮ „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.':'In the browser menu ⋮ choose “Install app” or “Add to home screen”.',
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',

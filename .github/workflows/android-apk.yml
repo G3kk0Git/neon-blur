@@ -1,5 +1,5 @@
 # Baut aus dem Ordner chordwave/ eine eigenständige Android-App (APK) mit Capacitor.
-# Ergebnis: unter "Actions" → jeweiliger Lauf → "Artifacts" → Chordwave-APK herunterladen.
+# Ergebnis: unter "Actions" → jeweiliger Lauf → "Artifacts" → DriftingChords-APK herunterladen.
 name: Android APK
 
 on:
@@ -36,8 +36,8 @@ jobs:
           mkdir www && cp -r ../chordwave/* www/
           cat > capacitor.config.json <<'JSON'
           {
-            "appId": "app.chordwave.synth",
-            "appName": "Chordwave",
+            "appId": "app.driftingchords",
+            "appName": "Drifting Chords",
             "webDir": "www",
             "android": { "backgroundColor": "#0b0a12" }
           }
@@ -76,24 +76,24 @@ jobs:
           cd apk/android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/Chordwave-1.0.${GITHUB_RUN_NUMBER}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/Chordwave.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/DriftingChords-1.0.${GITHUB_RUN_NUMBER}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/DriftingChords.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Chordwave-APK
-          path: Chordwave-1.0.*.apk
+          name: DriftingChords-APK
+          path: DriftingChords-1.0.*.apk
           retention-days: 30
 
-      # fester Download-Link: …/releases/download/apk-latest/Chordwave.apk
+      # fester Download-Link: …/releases/download/apk-latest/DriftingChords.apk
       - name: Als Release veröffentlichen
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-latest
-          name: Chordwave (aktuelle APK)
+          name: Drifting Chords (aktuelle APK)
           body: |
-            Aktuelle Test-APK von Chordwave (Version 1.0.${{ github.run_number }}).
-            Download: Chordwave.apk – einfach über die alte Version installieren, Daten bleiben erhalten.
-          files: Chordwave.apk
+            Aktuelle Test-APK von Drifting Chords – Harmony in endless motion. (Version 1.0.${{ github.run_number }}).
+            Download: DriftingChords.apk – einfach über die alte Version installieren, Daten bleiben erhalten.
+          files: DriftingChords.apk
           make_latest: true
           overwrite_files: true

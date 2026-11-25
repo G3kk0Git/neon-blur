@@ -1,15 +1,15 @@
 {
- "id": "/chordwave-app",
- "name": "Chordwave",
- "short_name": "Chordwave",
- "description": "Akkorde spielen, gleiten lassen, loopen und exportieren.",
+ "id": "/driftingchords-app",
+ "name": "Drifting Chords",
+ "short_name": "DriftChords",
+ "description": "Harmony in endless motion – Akkorde spielen, Stimmen gleiten lassen, Loops bauen, als WAV/MIDI exportieren.",
  "lang": "de",
- "start_url": "./?app=chordwave",
+ "start_url": "./?app=driftingchords",
  "scope": "./",
  "display": "standalone",
  "orientation": "any",
- "background_color": "#0b0a12",
- "theme_color": "#0b0a12",
+ "background_color": "#0a0912",
+ "theme_color": "#0a0912",
  "categories": [
   "music"
  ],
