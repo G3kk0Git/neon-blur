@@ -10,6 +10,9 @@ on:
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -74,9 +77,23 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/Chordwave-1.0.${GITHUB_RUN_NUMBER}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/Chordwave.apk"
 
       - uses: actions/upload-artifact@v4
         with:
           name: Chordwave-APK
-          path: Chordwave-*.apk
+          path: Chordwave-1.0.*.apk
           retention-days: 30
+
+      # fester Download-Link: …/releases/download/apk-latest/Chordwave.apk
+      - name: Als Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Chordwave (aktuelle APK)
+          body: |
+            Aktuelle Test-APK von Chordwave (Version 1.0.${{ github.run_number }}).
+            Download: Chordwave.apk – einfach über die alte Version installieren, Daten bleiben erhalten.
+          files: Chordwave.apk
+          make_latest: true
+          overwrite_files: true
