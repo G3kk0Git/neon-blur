@@ -289,6 +289,9 @@ body.focus #focus{display:block}
         <label>Tonart <select id="genKey"><option value="cur">aktuelle</option><option value="rnd">zufällig</option></select></label>
       </div>
       <div class="row">
+        <label><input type="checkbox" id="genKit"> Sound, Beat und Tempo passend zum Stil</label>
+      </div>
+      <div class="row">
         <button id="genBtn" class="on">✨ Abfolge erzeugen</button>
         <button id="undoBtn" disabled>↶ Rückgängig</button>
       </div>
@@ -745,19 +748,21 @@ function pickW(obj){
 
 /* ---------- Generator ---------- */
 const STYLES = {
-  'Pop':          {mode:null,  beats:[4],   phrase:4, color:{}, boost:{},
+  'Pop':          {idiom:0.85, vary:0.1, mode:null,  beats:[4],   phrase:4, color:{}, boost:{},
                    net:{wCommon:0.5, wVL:0.6, wFunc:1.3, wSur:-0.7, wT:0.5, cat:{borrow:0.15, mediant:-0.8, tritone:-0.5}, q:{}, temp:0.35}},
-  'Melancholisch':{mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{},
+  'Melancholisch':{idiom:0.8, vary:0.2, mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{},
                    net:{wCommon:0.8, wVL:0.8, wFunc:0.9, wSur:0, wT:0.4, cat:{borrow:0.6, nr:0.2, mediant:-0.7, tritone:-0.4}, q:{min:0.35, dom:-0.2}, temp:0.4}},
-  'Jazz':         {mode:'maj', beats:[2,4], phrase:4, color:{'':[['maj7',3],['maj9',1]], m:[['m7',3],['m9',1]], dim:[['dim',1]]}, dom:'7', boost:{1:{4:4}, 4:{0:4}, 5:{1:2}},
+  'Jazz':         {idiom:0.75, vary:0.35, mode:'maj', beats:[2,4], phrase:4, color:{'':[['maj7',3],['maj9',1]], m:[['m7',3],['m9',1]], dim:[['dim',1]]}, dom:'7', boost:{1:{4:4}, 4:{0:4}, 5:{1:2}},
                    net:{wCommon:0.4, wVL:0.9, wFunc:1.2, wSur:0.15, wT:0.5, cat:{secdom:0.7, tritone:0.5, borrow:0.2, mediant:-0.3}, q:{dom:0.15}, temp:0.4, alt:true}},
-  'Lo-Fi':        {mode:null,  beats:[4],   phrase:4, color:{'':[['maj7',2],['maj9',1],['add9',1]], m:[['m7',2],['m9',2]]}, dom:'7', boost:{1:{4:2}},
+  'Lo-Fi':        {idiom:0.85, vary:0.2, mode:null,  beats:[4],   phrase:4, color:{'':[['maj7',2],['maj9',1],['add9',1]], m:[['m7',2],['m9',2]]}, dom:'7', boost:{1:{4:2}},
                    net:{wCommon:0.7, wVL:0.9, wFunc:0.9, wSur:-0.1, wT:0.35, cat:{secdom:0.3, borrow:0.35, mediant:-0.4}, q:{}, temp:0.4}},
-  'Ambient':      {mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{},
+  'Ambient':      {idiom:0.7, vary:0.15, mode:null,  beats:[8],   phrase:4, color:{'':[['add9',2],['sus2',2],['maj7',1]], m:[['m9',2],['m7',1],['sus2',1]]}, noDim:true, flat:true, boost:{},
                    net:{wCommon:1.3, wVL:1.1, wFunc:0.3, wSur:0.1, wT:0.6, cat:{nr:0.45, mediant:0.25, secdom:-0.6, tritone:-0.8}, q:{dom:-0.6, dim:-1, aug:-1}, temp:0.45, calm:true}},
-  'Episch':       {mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}},
+  'Episch':       {idiom:0.8, vary:0.2, mode:'min', beats:[4,8], phrase:4, color:{'':[['',4],['sus4',1]], m:[['m',1]]}, boost:{0:{5:4}, 5:{2:3,6:3}, 2:{6:3}, 6:{0:3}},
                    net:{wCommon:0.7, wVL:0.6, wFunc:0.9, wSur:0.2, wT:0.45, cat:{mediant:0.35, borrow:0.7, nr:0.3}, q:{maj:0.2, dim:-0.6}, temp:0.4}},
-  'Überraschend': {mode:null,  beats:[4],   phrase:4, color:{'':[['',2],['maj7',1],['add9',1]], m:[['m',2],['m7',1],['m9',1]]}, dom:'7', boost:{},
+  'Progressive House': {mode:null, beats:[4,8], phrase:4, color:{'':[['',2],['add9',2],['sus2',1]], m:[['m',2],['m7',1],['m9',1]]}, boost:{}, idiom:0.8, vary:0.15,
+                   net:{wCommon:0.8, wVL:0.8, wFunc:0.9, wSur:0, wT:0.4, cat:{borrow:0.5, nr:0.2, mediant:-0.5, tritone:-0.6, secdom:-0.3}, q:{dom:-0.3, dim:-0.8}, temp:0.4}},
+  'Überraschend': {mode:null, idiom:0,  beats:[4],   phrase:4, color:{'':[['',2],['maj7',1],['add9',1]], m:[['m',2],['m7',1],['m9',1]]}, dom:'7', boost:{},
                    net:{wCommon:0.7, wVL:0.9, wFunc:0.7, wSur:0.9, wT:0.4, cat:{mediant:0.4, nr:0.4, tritone:0.3, borrow:0.3, secdom:0.3}, q:{}, temp:0.5, alt:true}},
 };
 // Farbe wählen, aber nur wenn alle Töne in der Tonart liegen (sonst z. B. Gmaj7 in C-Dur vermeiden)
@@ -816,6 +821,57 @@ function genPhraseNet(st, k, start, len){
   }
   return out;
 }
+// Stufen-Schreibweise in Akkorde übersetzen: 'I V vi IV', '♭VImaj7', 'ii7', 'V13', 'vii°' …
+function parseRoman(k, tok){
+  const m = tok.match(/^(♭|♯)?(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)(°|ø)?(.*)$/);
+  if (!m) return null;
+  const up = m[2].toUpperCase(), deg = ['I','II','III','IV','V','VI','VII'].indexOf(up);
+  let iv = [0,2,4,5,7,9,11][deg] + (m[1] === '♭' ? -1 : m[1] === '♯' ? 1 : 0);
+  const lower = m[2] !== up, suf = m[4] || '';
+  let id;
+  if (m[3] === 'ø') id = 'm7b5';
+  else if (m[3] === '°') id = suf === '7' ? 'dim7' : 'dim';
+  else if (lower) id = suf ? (suf.startsWith('m') ? suf : 'm' + suf) : 'm';
+  else id = suf;
+  let type = TI(id); if (type < 0) type = TI(lower ? 'm' : '');
+  const root = (k.root + iv + 12) % 12;
+  const d = degreeOf(k, root);
+  const dia = d >= 0 && inKey(k, root, type);
+  return {root, type, cat: dia ? 'dia' : 'borrow', deg: dia ? d : undefined};
+}
+// typische Akkordfolgen je Stil (für Dur bzw. Moll); das Netzwerk variiert sie anschließend
+const IDIOMS = {
+  'Pop':          {maj:['I V vi IV','vi IV I V','I vi IV V','I IV vi V','IV I V vi','I V IV IV'], min:['i ♭VI ♭III ♭VII','i ♭VII ♭VI ♭VII','i iv ♭VI ♭VII']},
+  'Melancholisch':{min:['i ♭VI ♭III ♭VII','i iv ♭VI V','i ♭VII ♭VI V','i iv i V','i ♭III ♭VII iv','i ♭VI iv V']},
+  'Jazz':         {maj:['ii7 V7 Imaj7 Imaj7','Imaj7 vi7 ii7 V7','iii7 VI7 ii7 V7','Imaj7 IV7 iii7 VI7','ii7 V7 Imaj7 VI7']},
+  'Lo-Fi':        {maj:['ii9 V13 Imaj9 vi9','Imaj7 vi7 ii7 V7','IVmaj7 V7 iii7 vi7','IVmaj7 iii7 ii7 Imaj7'], min:['i9 iv9 ♭VIImaj7 ♭IIImaj7','i7 iv7 ♭VImaj7 V7']},
+  'Ambient':      {maj:['Iadd9 IVmaj7 Iadd9 IVmaj7','Isus2 vi7 Isus2 vi7','Iadd9 iii7 IVmaj7 Iadd9','Imaj7 IVadd9 vi9 IVmaj7'], min:['i9 ♭VImaj7 i9 ♭VImaj7','i9 ♭VIImaj7 ♭VImaj7 i9']},
+  'Episch':       {min:['i ♭VI ♭III ♭VII','i ♭VI ♭VII i','i iv ♭VII ♭III','i ♭VI iv V','i ♭III ♭VII ♭VI']},
+  'Progressive House': {min:['i ♭VI ♭III ♭VII','i ♭VII ♭VI ♭VII','i ♭III ♭VII iv','i ♭VI ♭VII ♭VII'], maj:['vi IV I V','I V vi IV','IV vi V V']},
+};
+// Variation: mit etwas Wahrscheinlichkeit Akkorde durch Netzwerk-Farben ersetzen
+function varyPhrase(st, k, ph){
+  const mood = st.net, out = ph.map(c => ({...c}));
+  for (let i = 0; i < out.length; i++){
+    if (Math.random() > (st.vary || 0.25)) continue;
+    const next = out[(i + 1) % out.length], c = out[i];
+    const opts = [];
+    if ((mood.cat.secdom || 0) > -0.3 && next) opts.push({w:1 + (mood.cat.secdom || 0), c:{root:(next.root + 7) % 12, type:TI('7'), cat:'secdom'}});           // Zwischendominante zum nächsten Akkord
+    if ((mood.cat.tritone || 0) > 0 && next) opts.push({w:mood.cat.tritone, c:{root:(next.root + 1) % 12, type:TI('7'), cat:'tritone'}});
+    if ((mood.cat.borrow || 0) > 0){ const q = QUAL(c.type); if (q === 'maj' && (c.root - k.root + 12) % 12 === 5) opts.push({w:0.8 + mood.cat.borrow, c:{root:c.root, type:TI('m'), cat:'borrow'}}); }
+    if ((mood.cat.nr || 0) > 0.2){ const q = QUAL(c.type); if (q === 'maj') opts.push({w:mood.cat.nr, c:{root:(c.root + 4) % 12, type:TI('m'), cat:'nr'}}); }
+    if (i === 0 || !opts.length) continue;                 // der Phrasenanfang bleibt
+    let r = Math.random() * opts.reduce((a, o) => a + o.w, 0);
+    for (const o of opts){ r -= o.w; if (r <= 0){ if (!(o.c.root === next.root && o.c.type === next.type)) out[i] = o.c; break; } }
+  }
+  return out;
+}
+function idiomPhrase(st, k, styleName){
+  const set = IDIOMS[styleName]; if (!set) return null;
+  const list = set[k.mode] || null; if (!list) return null;
+  const tpl = list[Math.floor(Math.random() * list.length)];
+  return tpl.split(' ').map(t => parseRoman(k, t)).filter(Boolean);
+}
 function generate(seconds, styleName, key, exactBeats){
   const st = STYLES[styleName];
   let k = {...key};
@@ -827,12 +883,16 @@ function generate(seconds, styleName, key, exactBeats){
   let totalBeats = Math.max(unit, Math.round(want / unit) * unit);
   if (exactBeats){ totalBeats = exactBeats; while (beats > 2 && beats * 2 > exactBeats) beats /= 2; }
   const tonic = {...diatonic(k, 0), cat:'dia', deg:0};
-  const A = genPhraseNet(st, k, tonic, st.phrase);
+  // A: meist eine stiltypische Folge (variiert), sonst frei durchs Netzwerk
+  const idA = Math.random() < (st.idiom ?? 0.7) ? idiomPhrase(st, k, styleName) : null;
+  const A = idA ? varyPhrase(st, k, idA) : genPhraseNet(st, k, tonic, st.phrase);
   // B-Teil beginnt woanders (Subdominante, Parallele oder trugschlüssig), endet aber wieder mit Rückführung
   const bStartDeg = [3, 5, 1][Math.floor(Math.random() * 3)];
   let bStart = {...diatonic(k, bStartDeg), cat:'dia', deg:bStartDeg};
   if (A[A.length - 1].root === bStart.root) bStart = {...diatonic(k, bStartDeg === 3 ? 5 : 3), cat:'dia', deg: bStartDeg === 3 ? 5 : 3};
-  const B = genPhraseNet(st, k, bStart, st.phrase);
+  let B = null;
+  if (Math.random() < (st.idiom ?? 0.7) * 0.6){ for (let tries = 0; tries < 4 && !B; tries++){ const c = idiomPhrase(st, k, styleName); if (c && c.map(x => x.root).join() !== A.map(x => x.root).join()) B = varyPhrase(st, k, c); } }
+  if (!B) B = genPhraseNet(st, k, bStart, st.phrase);
   const colA = A.map(c => extend(st, k, c)), colB = B.map(c => extend(st, k, c));
   const form = [[A, colA], [A, colA], [B, colB], [A, colA]];
   const out = []; let sum = 0, f = 0;
@@ -857,6 +917,16 @@ const BEATS = {
   'Minimal':           {bpm:120, parts:{k:'x...x...x...x...', r:'..........o.x...', h:'..o...o...o...o.'}},
 };
 const DRUM_MIDI = {k:36, s:38, c:39, h:42, o:46, r:37};
+
+const STYLE_KIT = {
+  'Pop':               {preset:'Weiches Pad',          beat:'House (4/4)',       bpm:112},
+  'Melancholisch':     {preset:'Analog-Strings',       beat:'off',               bpm:76},
+  'Jazz':              {preset:'Glas-Keys',            beat:'Lo-Fi (Swing)',     bpm:96},
+  'Lo-Fi':             {preset:'Glas-Keys',            beat:'Lo-Fi (Swing)',     bpm:84},
+  'Ambient':           {preset:'Weiches Pad',          beat:'off',               bpm:70},
+  'Episch':            {preset:'Analog-Strings',       beat:'Half-Time',         bpm:140},
+  'Progressive House': {preset:'Prog-House: Pluck',    beat:'Progressive House', bpm:128},
+};
 
 /* ---------- Klangerzeugung ---------- */
 const MAX_VOICES = 6;
@@ -1566,6 +1636,18 @@ function exportMidi(){
 const WIN = 6;                 // sichtbare Sekunden
 const VOICE_COLORS = ['#7cf0d0','#7cc8ff','#ffd27c','#ff9ad5','#9cff8f','#f4f1ff'];
 const BASS_COLOR = '#b18cff';
+// Neon: weicher Schein in mehreren Lagen (additiv), heller Kern, leichtes Schimmern
+function hexMix(hex, f){ const n = parseInt(hex.slice(1), 16), r = n >> 16, g2 = (n >> 8) & 255, b = n & 255;
+  return `rgb(${Math.round(r + (255 - r) * f)},${Math.round(g2 + (255 - g2) * f)},${Math.round(b + (255 - b) * f)})`; }
+function neonStroke(g, col, idx, scale = 1, dim = 1){
+  const t = performance.now() / 1000, shimmer = 0.82 + 0.18 * Math.sin(t * 2.1 + idx * 1.7) * Math.sin(t * 0.73 + idx);
+  g.save();
+  g.globalCompositeOperation = 'lighter'; g.strokeStyle = col;
+  for (const [w, a] of [[24, 0.045], [14, 0.09], [7, 0.18]]){ g.globalAlpha = a * shimmer * dim; g.lineWidth = w * scale; g.stroke(); }
+  g.globalAlpha = 0.95 * dim; g.lineWidth = 2.6 * scale; g.stroke();
+  g.strokeStyle = hexMix(col, 0.65); g.globalAlpha = 0.75 * shimmer * dim; g.lineWidth = 1.1 * scale; g.stroke();
+  g.restore();
+}
 const hist = [];
 let viewLo = 52, viewHi = 76;
 function fitCanvas(cv){
@@ -1647,10 +1729,7 @@ function drawLines(){
     }
     const lf = hist[hist.length - 1];
     if (open && lf && lf.a >= 0.01) g.lineTo(x(lf.t), y(lf.m[i]));
-    g.strokeStyle = col;
-    // Leuchten als breite, transparente Linie (viel billiger als shadowBlur)
-    g.globalAlpha = i === MAX_VOICES ? 0.12 : 0.18; g.lineWidth = i === MAX_VOICES ? 6 : 9; g.stroke();
-    g.globalAlpha = i === MAX_VOICES ? 0.6 : 1; g.lineWidth = i === MAX_VOICES ? 2 : 2.5; g.stroke();
+    neonStroke(g, col, i, i === MAX_VOICES ? 0.8 : 1, i === MAX_VOICES ? 0.7 : 1);
     const f = hist[hist.length - 1];
     if (f && f.a > 0.01){
       const py = y(f.m[i]);
@@ -1752,7 +1831,7 @@ function pianoHit(e){
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','genKit','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -2030,7 +2109,14 @@ KEYS.forEach((k, i) => { const o = document.createElement('option'); o.value = i
 els.keySel.addEventListener('change', () => { keyFixed = els.keySel.value === 'auto' ? null : KEYS[+els.keySel.value]; updateHarmony(); });
 // Generator
 Object.keys(STYLES).forEach(n => { const o = document.createElement('option'); o.textContent = n; els.genStyle.append(o); });
+function applyStyleKit(name){
+  const kit = STYLE_KIT[name]; if (!kit) return;
+  fillPresets('b:' + kit.preset); loadPreset('b:' + kit.preset);
+  P.beat = kit.beat; P.bpm = kit.bpm; els.bpm.value = P.bpm;
+  syncUI(); changed('preset');
+}
 function runGenerator(seconds, exactBeats){
+  if (els.genKit.checked) applyStyleKit(els.genStyle.value);
   const key = els.genKey.value === 'rnd' ? KEYS[Math.floor(Math.random() * 12) + (Math.random() < 0.5 ? 0 : 12)] : currentKey();
   const g = generate(seconds, els.genStyle.value, key, exactBeats);
   pushUndo(); loopSeed = Math.floor(Math.random() * 1e6);
@@ -2044,6 +2130,8 @@ function runGenerator(seconds, exactBeats){
   setTimeout(startLoop, 120);
 }
 els.genBtn.addEventListener('click', () => runGenerator(+els.genDur.value));
+try { els.genKit.checked = localStorage.getItem('chordwave.kit') !== '0'; } catch(e){ els.genKit.checked = true; }
+els.genKit.addEventListener('change', () => { try { localStorage.setItem('chordwave.kit', els.genKit.checked ? '1' : '0'); } catch(e){} });
 els.undoBtn.addEventListener('click', undo);
 
 /* ---------- Fokus-Modus ---------- */
@@ -2186,9 +2274,17 @@ function drawFocus(){
   // Takte und Akkordnamen
   g.font = '600 11px system-ui'; g.textBaseline = 'top';
   for (let b = 0; b <= beats; b += 4){ g.fillStyle = b % (beats) === 0 ? 'rgba(236,233,247,.18)' : 'rgba(236,233,247,.10)'; g.fillRect(Math.round(X(b)), 0, 1, h); }
-  let acc = 0;
+  let acc = 0, lastEnd = -1e9;
   steps.forEach((st, k) => {
-    if (st.root != null){ g.fillStyle = k === playingStep && looping ? '#7cf0d0' : 'rgba(236,233,247,.6)'; g.fillText(chordName(st.root, st.type), X(acc) + 4, 5); }
+    if (st.root != null){
+      const name = chordName(st.root, st.type), x0 = X(acc) + 4, tw = g.measureText(name).width;
+      const room = X(acc + st.beats) - x0 - 2;
+      if (x0 > lastEnd + 4 && (tw <= room || room > 18)){
+        g.fillStyle = k === playingStep && looping ? '#7cf0d0' : 'rgba(236,233,247,.6)';
+        if (tw > room){ g.save(); g.beginPath(); g.rect(x0, 0, room, 20); g.clip(); g.fillText(name, x0, 5); g.restore(); lastEnd = x0 + room; }
+        else { g.fillText(name, x0, 5); lastEnd = x0 + tw; }
+      }
+    }
     acc += st.beats;
   });
   if (!lv.events.length) return;
@@ -2223,8 +2319,7 @@ function drawFocus(){
       if (m == null){ open = false; continue; }
       const x = X(b), y = Y(m); open ? g.lineTo(x, y) : g.moveTo(x, y); open = true;
     }
-    g.strokeStyle = col; g.globalAlpha = j === n ? 0.12 : 0.18; g.lineWidth = j === n ? 6 : 8; g.stroke();
-    g.globalAlpha = j === n ? 0.6 : 1; g.lineWidth = j === n ? 2 : 2.5; g.stroke(); g.globalAlpha = 1;
+    neonStroke(g, col, j, j === n ? 0.8 : 1, j === n ? 0.7 : 1);
   });
   // Abspielposition
   if (looping){
@@ -2370,7 +2465,7 @@ function drawDetail(){
       if (m == null){ open = false; continue; }
       open ? g.lineTo(px, Y(m)) : g.moveTo(px, Y(m)); open = true;
     }
-    g.strokeStyle = col; g.globalAlpha = 0.2; g.lineWidth = 10; g.stroke(); g.globalAlpha = 1; g.lineWidth = 3; g.stroke();
+    neonStroke(g, col, j, 1.2, 1);
   });
   // außerhalb des Takts abdunkeln
   g.fillStyle = 'rgba(7,6,12,0.6)';
