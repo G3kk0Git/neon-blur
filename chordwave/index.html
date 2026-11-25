@@ -381,13 +381,14 @@ body.focus #focus{display:block}
     <button id="dClose" title="schließen">✕</button>
   </div>
   <canvas id="dGraph"></canvas>
-  <p class="hint">Hell = dieser Takt, abgedunkelt = davor/danach. Schräge Linien am Anfang sind das <b>Gleiten</b> vom vorherigen Akkord. Punkt ziehen: <b>seitlich</b> = Einsatz, <b>hoch/runter</b> = Tonhöhe. Lila Linie = Bass.</p>
+  <p class="hint"><b>Schräge Linien</b> = Gleiten: die Stimme rutscht vom vorigen Ton zum neuen (Dauer = Gleitzeit, abschaltbar mit „〰 Gleiten“). <b>Einsatz</b> = wann sie losrutscht. Anschwellen betrifft nur die Lautstärke. Punkt ziehen: seitlich = Einsatz, hoch/runter = Tonhöhe.</p>
   <div class="fvoice" id="fVoice">
     <div class="t" id="fVoiceInfo"></div>
     <div class="row">
       <button id="fvSync" title="Alle Stimmen wechseln gleichzeitig">⇉ Gleichzeitig</button>
       <button id="fvDice" title="Neue zufällige Einsätze für diesen Takt">🎲 Neu würfeln</button>
       <button id="fvMove" title="Bewegung innerhalb des Akkords: automatisch / an / aus">↝ Bewegung: auto</button>
+      <button id="fvGlide" title="Gleiten in diesen Akkord an/aus">〰 Gleiten: an</button>
       <button id="fvReset" title="Eigene Einstellungen dieses Takts entfernen">↺ Zurücksetzen</button>
     </div>
     <div class="vgrid" id="fvGrid"></div>
@@ -396,6 +397,7 @@ body.focus #focus{display:block}
   <div class="fvoice">
     <div class="t">Für alle Takte</div>
     <div class="row">
+      <label>Gleiten <input type="range" id="fvGlideAll" min="0" max="1.5" step="0.01"></label>
       <label>Versatz <input type="range" id="fvStagger" min="0" max="1" step="0.01"></label>
       <label>Bewegung <input type="range" id="fvMotion" min="0" max="1" step="0.01"></label>
     </div>
@@ -964,7 +966,7 @@ class Engine{
     v.from = cur; v.to = f; v.t0 = t; v.t1 = t + Math.max(glide, 0.0001);
   }
   // offs: Versatz je Stimme in Sekunden, glides: Gleitzeit je Stimme (beides optional)
-  play(voiced, t, offs, glides, boff){
+  play(voiced, t, offs, glides, boff, bglide){
     const p = this.p, was = this.gate;
     const all = voiced.notes.slice();
     const strum = p.strum || 0;
@@ -974,7 +976,7 @@ class Engine{
       const gl = !was ? 0 : (glides ? glides[j] : p.glide);
       this.glideVoice(this.voices[i], mtof(all[j]), ti, gl);
     }
-    const glide = was ? p.glide : 0;
+    const glide = was ? (bglide != null ? bglide : p.glide) : 0;
     this.glideVoice(this.voices[MAX_VOICES], mtof(voiced.bass), was ? t + (boff || 0) : t, glide);
     if (!this.gate || p.retrig) this.gateOn(t);
   }
@@ -1274,9 +1276,10 @@ function buildLoopEvents(st, p){
         if (x.sync) return 0;
         return chg[i] && prevN ? Math.round(srand(kk, i) * p.stagger * Math.min(L, 4) * 0.5 * 4) / 4 : 0;   // auf Viertel-Schläge
       });
-      const glides = notes.map((nt, i) => p.glide * (0.7 + 0.6 * srand(kk, i + 20)));
+      const gl = x.noglide ? 0 : p.glide;                 // Gleiten: für alle Stimmen gleich, pro Takt abschaltbar
+      const glides = notes.map(() => gl);
       const bass = x.bass != null ? x.bass : v.bass, boff = x.boff != null ? Math.min(x.boff, L * 0.95) : 0;
-      out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:notes.slice(), bass, boff, offs, glides, L, chg});
+      out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:notes.slice(), bass, boff, offs, glides, L, chg, bglide: gl});
       lastNotes = notes.slice();
       const doMove = x.move === true ? L >= 2 : x.move === false ? false : (p.motion > 0 && L >= 4 && srand(kk, 99) < p.motion);
       if (doMove){
@@ -1293,7 +1296,7 @@ function buildLoopEvents(st, p){
 function playEvent(eng, ev, t, spb, live){
   if (ev.kind === 'off'){ eng.gateOff(t); if (live) uiAt(t, () => markPlaying(ev.k)); return; }
   if (ev.kind === 'move'){ eng.moveVoice(ev.i, ev.note, t, ev.glide); if (live && leader.prev && leader.prev.length > ev.i) leader.prev[ev.i] = ev.note; return; }
-  eng.play({notes:ev.notes, bass:ev.bass}, t, ev.offs.map(o => o * spb), ev.glides, (ev.boff || 0) * spb);
+  eng.play({notes:ev.notes, bass:ev.bass}, t, ev.offs.map(o => o * spb), ev.glides, (ev.boff || 0) * spb, ev.bglide);
   if (live){
     leader.prev = ev.notes.slice(); mark(t, ev.root, ev.type);
     uiAt(t, () => { if (looping){ showChord(ev.root, ev.type, ev.notes); markPlaying(ev.k); } });
@@ -2195,7 +2198,7 @@ function drawFocus(){
     if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
     if (e.kind === 'move'){ if (e.i < n) lanes[e.i].push({t:e.b, to:e.note, g:e.glide / spb}); continue; }
     for (let j = 0; j < n; j++){ const jj = Math.min(j, e.notes.length - 1); lanes[j].push({t:e.b + e.offs[jj], to:e.notes[jj], g:e.glides[jj] / spb}); }
-    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:P.glide / spb});
+    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:(e.bglide ?? P.glide) / spb});
   }
   lanes.forEach(l => l.sort((a, b) => a.t - b.t));
   const at = (l, b) => {
@@ -2245,7 +2248,7 @@ function stepAtBeat(beat){ let a = 0; for (let k = 0; k < steps.length; k++){ if
 function stepStart(k){ let a = 0; for (let i = 0; i < k; i++) a += steps[i].beats; return a; }
 function stepX(k){ const s = steps[k]; if (!s) return null; if (!s.x) s.x = {}; return s.x; }
 function editStep(k, fn){ if (!steps[k] || steps[k].root == null) return; pushUndo(); fn(stepX(k)); markLoopDirty(); save(); renderDetail(); }
-['detail','dGraph','dTitle','dPrev','dNext','dHear','dClose','fDetail','fBeat','fVoiceInfo','fvSync','fvDice','fvMove','fvReset','fvStagger','fvMotion','fvGrid','fvFree']
+['fvGlide','fvGlideAll','detail','dGraph','dTitle','dPrev','dNext','dHear','dClose','fDetail','fBeat','fVoiceInfo','fvSync','fvDice','fvMove','fvReset','fvStagger','fvMotion','fvGrid','fvFree']
   .forEach(id => els[id] = document.getElementById(id));
 fillBeatSelect(els.fBeat); syncBeatSelects();
 els.fBeat.addEventListener('change', () => setBeat(els.fBeat.value));
@@ -2271,7 +2274,9 @@ function renderDetail(){
   const sm = document.createElement('small'); sm.textContent = `Takt ${bar}${start % 4 ? ' (2. Hälfte)' : ''} · ${s.beats} Schläge`; els.dTitle.append(sm);
   const cs = chordSteps(), pos = cs.indexOf(detailK);
   els.dPrev.disabled = pos <= 0; els.dNext.disabled = pos < 0 || pos >= cs.length - 1;
-  els.fvStagger.value = P.stagger; els.fvMotion.value = P.motion;
+  els.fvStagger.value = P.stagger; els.fvMotion.value = P.motion; els.fvGlideAll.value = P.glide;
+  const x0 = s.x || {};
+  els.fvGlide.textContent = '〰 Gleiten: ' + (x0.noglide ? 'aus' : 'an'); els.fvGlide.classList.toggle('on', !!x0.noglide);
   const x = s.x || {}, custom = (x.offs && Object.keys(x.offs).length) || (x.pitch && Object.keys(x.pitch).length) || x.bass != null || x.boff != null;
   els.fVoiceInfo.textContent = custom ? 'Eigene Einstellungen sind lila markiert.' : 'Noch automatisch – ändere Höhe oder Einsatz einzelner Stimmen.';
   els.fvSync.classList.toggle('on', !!x.sync && !(x.offs && Object.keys(x.offs).length));
@@ -2331,7 +2336,7 @@ function drawDetail(){
     if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
     if (e.kind === 'move'){ if (e.i < n) lanes[e.i].push({t:e.b, to:e.note, g:e.glide / spb}); continue; }
     for (let j = 0; j < n; j++){ const jj = Math.min(j, e.notes.length - 1); lanes[j].push({t:e.b + e.offs[jj], to:e.notes[jj], g:e.glides[jj] / spb}); }
-    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:P.glide / spb});
+    lanes[n].push({t:e.b + (e.boff || 0), to:e.bass, g:(e.bglide ?? P.glide) / spb});
   }
   lanes.forEach(l => l.sort((a, b) => a.t - b.t));
   const at = (l, b) => {
@@ -2377,9 +2382,7 @@ function drawDetail(){
   if (P.bass) items.push({j:'bass', m:ev.bass, off:ev.boff || 0, col:BASS_COLOR});
   // Griffe, die fast übereinanderliegen, leicht nach rechts versetzen
   // Griff dort, wo die Stimme ihren Ton erreicht (Einsatz + Gleitzeit) – so liegt er auf der Linie
-  items.forEach(it => { const gl = (it.j === 'bass' ? P.glide : ev.glides[it.j]) / spb; it.hx = X(b0 + Math.min(ev.L, it.off + gl)); it.hy = Y(it.m); });
-  const byY = items.slice().sort((p, q) => p.hy - q.hy);
-  for (let i = 1; i < byY.length; i++){ const a1 = byY[i - 1], a2 = byY[i]; if (Math.abs(a2.hy - a1.hy) < 22 && Math.abs(a2.hx - a1.hx) < 22) a2.hx = a1.hx + 22; }
+  items.forEach(it => { const gl = (it.j === 'bass' ? (ev.bglide ?? P.glide) : ev.glides[it.j]) / spb; it.hx = X(b0 + Math.min(ev.L, it.off + gl)); it.hy = Y(it.m); });
   for (const it of items){
     const hx = it.hx, hy = it.hy, drag = detailDrag && detailDrag.j === it.j;
     detailHandles.push({...it, x:hx, y:hy});
@@ -2438,6 +2441,8 @@ els.fvFree.addEventListener('change', () => { try { localStorage.setItem('chordw
 els.fvSync.addEventListener('click', () => editStep(detailK, x => { x.sync = !(x.sync && !(x.offs && Object.keys(x.offs).length)); delete x.offs; delete x.boff; }));
 els.fvDice.addEventListener('click', () => editStep(detailK, x => { x.seed = 1 + Math.floor(Math.random() * 9999); delete x.offs; delete x.sync; }));
 els.fvMove.addEventListener('click', () => editStep(detailK, x => { x.move = x.move == null ? true : x.move === true ? false : undefined; if (x.move === undefined) delete x.move; }));
+els.fvGlide.addEventListener('click', () => editStep(detailK, x => { if (x.noglide) delete x.noglide; else x.noglide = true; }));
+els.fvGlideAll.addEventListener('input', () => { P.glide = +els.fvGlideAll.value; if (knobEls.glide) knobEls.glide.set(P.glide); els.preset.value = ''; changed('glide'); });
 els.fvReset.addEventListener('click', () => editStep(detailK, x => { for (const key of Object.keys(x)) delete x[key]; }));
 els.fvStagger.addEventListener('input', () => { P.stagger = +els.fvStagger.value; if (knobEls.stagger) knobEls.stagger.set(P.stagger); changed('stagger'); });
 els.fvMotion.addEventListener('input', () => { P.motion = +els.fvMotion.value; if (knobEls.motion) knobEls.motion.set(P.motion); changed('motion'); });
