@@ -141,7 +141,10 @@ body.focus #focus{display:block}
 .fvoice .t b{color:var(--text)}
 .fvoice label{font-size:12px;color:var(--dim);display:flex;align-items:center;gap:6px;flex:1;min-width:140px}
 .fvoice input[type=range]{flex:1}
-.vgrid{display:grid;grid-template-columns:64px 1fr 1fr 54px;gap:4px 8px;align-items:center}
+.vgrid{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center}
+.vgrid .stp{display:flex;align-items:center;gap:4px}
+.vgrid .stp button{width:40px;height:36px;padding:0;font-size:15px}
+.vgrid .stp span{min-width:44px;text-align:center;font-size:12px;color:var(--dim)}
 .vgrid .h{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
 .vgrid .nm{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px}
 .vgrid .nm i{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
@@ -378,7 +381,7 @@ body.focus #focus{display:block}
     <button id="dClose" title="schließen">✕</button>
   </div>
   <canvas id="dGraph"></canvas>
-  <p class="hint">Punkt ziehen: <b>seitlich</b> = später/früher einsetzen, <b>hoch/runter</b> = andere Tonhöhe (rastet auf Akkordtönen ein). Die unterste lila Linie ist der Bass.</p>
+  <p class="hint">Hell = dieser Takt, abgedunkelt = davor/danach. Schräge Linien am Anfang sind das <b>Gleiten</b> vom vorherigen Akkord. Punkt ziehen: <b>seitlich</b> = Einsatz, <b>hoch/runter</b> = Tonhöhe. Lila Linie = Bass.</p>
   <div class="fvoice" id="fVoice">
     <div class="t" id="fVoiceInfo"></div>
     <div class="row">
@@ -2279,25 +2282,31 @@ function renderDetail(){
 function renderVoiceGrid(){
   const grid = els.fvGrid; grid.innerHTML = '';
   const k = detailK, s = steps[k], ev = detailEvent(); if (!s || !ev) return;
-  for (const h of ['Stimme', 'Höhe', 'Einsatz', '']){ const d = document.createElement('div'); d.className = 'h'; d.textContent = h; grid.append(d); }
+  for (const h of ['Stimme', 'Höhe', 'Einsatz']){ const d = document.createElement('div'); d.className = 'h'; d.textContent = h; grid.append(d); }
   const pcs = new Set(chordPcs(s.root, s.type)), x = s.x || {};
   const nameOf = n => (pcs.has(((n % 12) + 12) % 12) ? toneName(s.root, s.type, n) : noteDisp(n)) + (Math.floor(n / 12) - 1);
   const rows = ev.notes.map((n0, j) => ({j, n0, off:ev.offs[j], col:VOICE_COLORS[j], own:(x.pitch && x.pitch[j] != null) || (x.offs && x.offs[j] != null), cand:voiceCands(s, n0)}));
   rows.reverse();                                          // oben die höchste Stimme …
   if (P.bass) rows.push({j:'bass', n0:ev.bass, off:ev.boff || 0, col:BASS_COLOR, own:x.bass != null || x.boff != null, cand:bassCands(s, ev.bass)});   // … unten der Bass
+  const maxOff = Math.max(0.25, Math.floor(ev.L * 0.95 * 4) / 4);
+  const btn = (t, title, fn) => { const b = document.createElement('button'); b.textContent = t; b.title = title; b.addEventListener('click', fn); return b; };
   rows.forEach(r => {
     const nm = document.createElement('div'); nm.className = 'nm' + (r.own ? ' own' : '');
     const dot = document.createElement('i'); dot.style.background = r.col;
     const lab = document.createElement('span'); lab.textContent = (r.j === 'bass' ? 'Bass ' : '') + nameOf(r.n0); nm.append(dot, lab);
-    const hi = document.createElement('input'); hi.type = 'range'; hi.min = 0; hi.max = r.cand.length - 1; hi.step = 1; hi.value = r.cand.indexOf(r.n0);
-    const en = document.createElement('input'); en.type = 'range'; en.min = 0; en.max = Math.max(0.25, Math.floor(ev.L * 0.95 * 4) / 4); en.step = 0.25; en.value = r.off;
-    const val = document.createElement('div'); val.className = 'val'; val.textContent = '+' + fmtBeats(r.off).replace(' Schl.', '');
-    let pushed = false; const begin = () => { if (!pushed){ pushUndo(); pushed = true; } };
-    hi.addEventListener('input', () => { begin(); const m = r.cand[+hi.value]; setVoicePitch(r.j, m); lab.textContent = (r.j === 'bass' ? 'Bass ' : '') + nameOf(m); nm.classList.add('own'); hearDetail(); });
-    en.addEventListener('input', () => { begin(); setVoiceOff(r.j, +en.value); val.textContent = '+' + fmtBeats(+en.value).replace(' Schl.', ''); nm.classList.add('own'); });
-    const done = () => { pushed = false; save(); renderDetail(); };
-    hi.addEventListener('change', done); en.addEventListener('change', done);
-    grid.append(nm, hi, en, val);
+    const i0 = r.cand.indexOf(r.n0);
+    const pitch = document.createElement('div'); pitch.className = 'stp';
+    const stepP = d => { const m = r.cand[i0 + d]; if (m == null) return; pushUndo(); setVoicePitch(r.j, m); save(); hearDetail(); renderDetail(); };
+    const down = btn('▼', 'tiefer', () => stepP(-1)), up = btn('▲', 'höher', () => stepP(1));
+    down.disabled = i0 <= 0; up.disabled = i0 >= r.cand.length - 1;
+    pitch.append(down, up);
+    const ent = document.createElement('div'); ent.className = 'stp';
+    const stepE = d => { const o = Math.max(0, Math.min(maxOff, Math.round((r.off + d) * 4) / 4)); if (o === r.off) return; pushUndo(); setVoiceOff(r.j, o); save(); renderDetail(); };
+    const val = document.createElement('span'); val.textContent = r.off ? '+' + fmtBeats(r.off).replace(' Schl.', '') : 'sofort';
+    const l = btn('◀', 'früher', () => stepE(-0.25)), rr = btn('▶', 'später', () => stepE(0.25));
+    l.disabled = r.off <= 0; rr.disabled = r.off >= maxOff;
+    ent.append(l, val, rr);
+    grid.append(nm, pitch, ent);
   });
 }
 function setVoicePitch(j, m){ const x = stepX(detailK); if (j === 'bass') x.bass = m; else { if (!x.pitch) x.pitch = {}; x.pitch[j] = m; } markLoopDirty(); }
@@ -2316,7 +2325,7 @@ function drawDetail(){
   g.clearRect(0, 0, w, h);
   const lv = ensureEvents(), ev = detailEvent(); if (!ev) return;
   const spb = 60 / P.bpm, b0 = ev.b, b1 = ev.b + ev.L, from = Math.max(0, b0 - 1), to = Math.min(lv.beats, b1 + 1);
-  const X = b => 34 + (b - from) / (to - from) * (w - 90);
+  const X = b => 34 + (b - from) / (to - from) * (w - 110);
   const n = P.voices, lanes = Array.from({length:n + 1}, () => []);
   for (const e of lv.events){
     if (e.kind === 'off'){ lanes.forEach(l => l.push({t:e.b, off:true})); continue; }
@@ -2358,21 +2367,30 @@ function drawDetail(){
     }
     g.strokeStyle = col; g.globalAlpha = 0.2; g.lineWidth = 10; g.stroke(); g.globalAlpha = 1; g.lineWidth = 3; g.stroke();
   });
+  // außerhalb des Takts abdunkeln
+  g.fillStyle = 'rgba(7,6,12,0.6)';
+  g.fillRect(0, 0, X(b0), h); g.fillRect(X(b1), 0, w - X(b1), h);
   // Griffe für diesen Akkord
   detailHandles = [];
   const pcsName = m => (pcs.has(((m % 12) + 12) % 12) ? toneName(ev.root, ev.type, m) : noteDisp(m)) + (Math.floor(m / 12) - 1);
   const items = ev.notes.map((m, j) => ({j, m, off:ev.offs[j], col:VOICE_COLORS[j]}));
   if (P.bass) items.push({j:'bass', m:ev.bass, off:ev.boff || 0, col:BASS_COLOR});
+  // Griffe, die fast übereinanderliegen, leicht nach rechts versetzen
+  // Griff dort, wo die Stimme ihren Ton erreicht (Einsatz + Gleitzeit) – so liegt er auf der Linie
+  items.forEach(it => { const gl = (it.j === 'bass' ? P.glide : ev.glides[it.j]) / spb; it.hx = X(b0 + Math.min(ev.L, it.off + gl)); it.hy = Y(it.m); });
+  const byY = items.slice().sort((p, q) => p.hy - q.hy);
+  for (let i = 1; i < byY.length; i++){ const a1 = byY[i - 1], a2 = byY[i]; if (Math.abs(a2.hy - a1.hy) < 22 && Math.abs(a2.hx - a1.hx) < 22) a2.hx = a1.hx + 22; }
   for (const it of items){
-    const hx = X(b0 + it.off), hy = Y(it.m), drag = detailDrag && detailDrag.j === it.j;
+    const hx = it.hx, hy = it.hy, drag = detailDrag && detailDrag.j === it.j;
     detailHandles.push({...it, x:hx, y:hy});
     g.beginPath(); g.arc(hx, hy, drag ? 13 : 10, 0, Math.PI * 2); g.fillStyle = '#07060c'; g.fill(); g.lineWidth = 3; g.strokeStyle = it.col; g.stroke();
-    const txt = pcsName(it.m) + (it.off ? '  +' + fmtBeats(it.off).replace(' Schl.', '') : '');
-    g.font = '600 11px system-ui'; g.textBaseline = 'middle';
-    const tw = g.measureText(txt).width, tx = Math.min(hx + 15, w - tw - 8), ty = hy - 15;
-    g.fillStyle = 'rgba(7,6,12,.85)'; g.beginPath(); g.roundRect ? g.roundRect(tx - 4, ty - 8, tw + 8, 16, 5) : g.rect(tx - 4, ty - 8, tw + 8, 16); g.fill();
-    g.fillStyle = it.col; g.fillText(txt, tx, ty);
   }
+  // Tonnamen rechts neben dem Takt, sortiert und ohne Überlappung
+  const labs = items.map(it => ({y:it.hy, col:it.col, txt:(it.j === 'bass' ? 'Bass ' : '') + pcsName(it.m) + (it.off ? ' +' + fmtBeats(it.off).replace(' Schl.', '') : '')})).sort((p, q) => p.y - q.y);
+  for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 15) labs[i].y = labs[i - 1].y + 15;
+  g.font = '600 11px system-ui'; g.textBaseline = 'middle';
+  const lx = Math.min(X(b1) + 8, w - 70);
+  labs.forEach(l => { g.fillStyle = 'rgba(7,6,12,.85)'; const tw = g.measureText(l.txt).width; g.fillRect(lx - 3, l.y - 8, tw + 6, 16); g.fillStyle = l.col; g.fillText(l.txt, lx, l.y); });
 }
 els.dGraph.addEventListener('pointerdown', e => {
   const r = els.dGraph.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
@@ -2393,7 +2411,7 @@ els.dGraph.addEventListener('pointermove', e => {
   if (!d.mode) return;
   d.moved = true;
   const lv = ensureEvents(), ev = detailEvent(); if (!ev) return;
-  const from = Math.max(0, ev.b - 1), to = Math.min(lv.beats, ev.b + ev.L + 1), pxPerBeat = (r.width - 90) / (to - from);
+  const from = Math.max(0, ev.b - 1), to = Math.min(lv.beats, ev.b + ev.L + 1), pxPerBeat = (r.width - 110) / (to - from);
   if (d.mode === 'x'){
     const off = Math.max(0, Math.min(Math.floor(d.L * 0.95 * 4) / 4, Math.round((d.off0 + dx / pxPerBeat) * 4) / 4));
     setVoiceOff(d.j, off);
