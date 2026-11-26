@@ -69,8 +69,8 @@ header #latchBtn{height:38px;padding:0 10px;font-size:14px}
 .pad.sugd{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6),0 0 10px rgba(124,240,208,.25)}
 .pad.sugd .deg{color:var(--accent)}
 .pad.fit{box-shadow:inset 0 0 0 1px rgba(124,240,208,.6)}
-html[lang=en] .pad.fit::after{content:"fits"}
-.pad.fit::after{content:"passt";position:absolute;left:6px;top:3px;font:600 9px system-ui;color:var(--accent)}
+html[lang=en] .pad.fit::after{content:"in key"}
+.pad.fit::after{content:"in Tonart";position:absolute;left:6px;top:3px;font:600 9px system-ui;color:var(--accent)}
 .steps{flex:0 0 auto;display:flex;gap:6px;overflow-x:auto;height:40px;align-items:stretch;scrollbar-width:none}
 .steps::-webkit-scrollbar{display:none}
 .step{flex:0 0 auto;min-width:52px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:0 10px;display:flex;align-items:center;gap:6px;font-weight:700;font-size:15px}
@@ -250,7 +250,7 @@ body.focus #focus{display:block}
   <section class="tab on" id="tab-play">
     <div class="sugs">
       <select id="keySel" title="Tonart"></select>
-      <span class="t">passt<br>jetzt:</span>
+      <span class="t">als<br>Nächstes:</span>
       <span id="sugs" style="display:contents"></span>
     </div>
     <div class="roots" id="roots"></div>
@@ -361,7 +361,7 @@ body.focus #focus{display:block}
   <canvas id="fGraph"></canvas>
   <div class="finfo"><div class="chordname" id="fChord"><span class="r">–</span></div><div class="fstatus" id="fStatus"></div>
     <button id="fDetail" class="fdet" title="Stimmen dieses Takts im Detail bearbeiten">🔍 Takt-Details</button></div>
-  <div class="sugs" id="fSugRow"><span class="t">passt<br>hier:</span><span id="fSugs" style="display:contents"></span></div>
+  <div class="sugs" id="fSugRow"><span class="t">passt<br>hierher:</span><span id="fSugs" style="display:contents"></span></div>
   <div class="froots" id="fRoots"></div>
   <div class="ftypes" id="fTypes"></div>
   <div class="fctl">
@@ -456,8 +456,8 @@ body.focus #focus{display:block}
 /* ---------- Musik-Daten ---------- */
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const CHORDS = [
-  {id:'',     label:'Dur',   iv:[0,4,7]},
-  {id:'m',    label:'Moll',  iv:[0,3,7]},
+  {id:'',     label:'maj',   iv:[0,4,7]},
+  {id:'m',    label:'m',     iv:[0,3,7]},
   {id:'7',    label:'7',     iv:[0,4,7,10]},
   {id:'maj7', label:'maj7',  iv:[0,4,7,11]},
   {id:'m7',   label:'m7',    iv:[0,3,7,10]},
@@ -618,9 +618,9 @@ function degreeOf(k, root){ return MODES[k.mode].steps.findIndex(x => (x + k.roo
 function diatonic(k, d){ return {root:(MODES[k.mode].steps[d] + k.root) % 12, type:TI(MODES[k.mode].q[d])}; }
 function chordPcs(root, type){ return CHORDS[type].iv.map(x => (x + root) % 12); }
 // Tonart aus den letzten gespielten Akkorden schätzen
-function guessKey(hist, uniform){
-  if (!hist.length) return {root:0, mode:'maj'};
-  let best = null, bs = -1;
+function guessKey(hist, uniform, prev){
+  if (!hist.length) return prev || {root:0, mode:'maj'};
+  let best = null, bs = -1, prevScore = -1;
   for (const k of KEYS){
     const nat = new Set(scalePcs(k).slice(0, 7));
     let score = 0;
@@ -634,8 +634,11 @@ function guessKey(hist, uniform){
       const d = degreeOf(k, h.root);
       if (d === 0 && CHORDS[h.type].iv[1] === (k.mode === 'maj' ? 4 : 3)) score += w * (i === 0 ? 0.9 : 0.4);
     });
+    if (prev && k.root === prev.root && k.mode === prev.mode) prevScore = score;
     if (score > bs + 1e-9){ bs = score; best = k; }
   }
+  // Hysterese: nicht bei jedem neuen Akkord die Tonart wechseln
+  if (prev && prevScore >= bs - 0.35 * Math.max(1, hist.length / 4)) return prev;
   return best;
 }
 /* ---------- Harmonie-Netzwerk ----------
@@ -769,7 +772,7 @@ function pickW(obj){
 
 /* ---------- Generator ---------- */
 const STYLES = {
-  'Pop':          {idiom:0.85, vary:0.1, mode:null,  beats:[4],   phrase:4, color:{}, boost:{},
+  'Pop':          {idiom:0.9, vary:0.06, mode:null,  beats:[4],   phrase:4, color:{}, boost:{},
                    net:{wCommon:0.5, wVL:0.6, wFunc:1.3, wSur:-0.7, wT:0.5, cat:{borrow:0.15, mediant:-0.8, tritone:-0.5}, q:{}, temp:0.35}},
   'Melancholisch':{idiom:0.8, vary:0.2, mode:'min', beats:[4,8], phrase:4, color:{'':[['',3],['add9',1]], m:[['m',3],['m7',1]]}, boost:{},
                    net:{wCommon:0.8, wVL:0.8, wFunc:0.9, wSur:0, wT:0.4, cat:{borrow:0.6, nr:0.2, mediant:-0.7, tritone:-0.4}, q:{min:0.35, dom:-0.2}, temp:0.4}},
@@ -819,19 +822,30 @@ function extend(st, k, c){
   const mood = st.net;
   if (c.cat === 'dia' && c.deg != null && CHORDS[c.type].iv.length === 3){
     const t = colorize(st, k, c.deg); if (inKey(k, c.root, t)) return t;
+    return c.type;
   }
-  if (QUAL(c.type) === 'dom' && mood.alt && Math.random() < 0.35) return TI(['9','13','7b9','7#9'][Math.floor(Math.random() * 4)]);
-  if (QUAL(c.type) === 'dom' && st.dom) return c.type;
-  if (st.color[CHORDS[c.type].id] && Math.random() < 0.5){ const o = st.color[CHORDS[c.type].id]; return TI(o[Math.floor(Math.random() * o.length)][0]); }
+  // Dominanten (auch Zwischendominanten) dürfen im Jazz alteriert werden
+  if (QUAL(c.type) === 'dom') return mood.alt && Math.random() < 0.3 ? TI(['9','13'][Math.floor(Math.random() * 2)]) : c.type;
+  // geliehene/chromatische Akkorde bleiben schlichte Dreiklänge – das hält die Harmonie klar
   return c.type;
 }
+// welche Netzwerk-Wege ein Stil benutzen darf (sonst klingt es schnell beliebig)
+const STYLE_CATS = {
+  'Pop':['dia','borrow','secdom'], 'Melancholisch':['dia','borrow','secdom'], 'Lo-Fi':['dia','borrow','secdom'],
+  'Jazz':['dia','borrow','secdom','tritone'], 'Ambient':['dia','borrow','nr'], 'Episch':['dia','borrow','nr','mediant'],
+  'Progressive House':['dia','borrow'], 'Überraschend':['dia','borrow','secdom','tritone','nr','mediant'],
+};
 function genPhraseNet(st, k, start, len){
   const mood = st.net, tonic = diatonic(k, 0), out = [{...start}];
+  const allowed = new Set(STYLE_CATS[st.name] || ['dia','borrow','secdom']);
   for (let i = 1; i < len; i++){
     const prev = out[i - 1];
-    let cands = netCandidates(k, prev).filter(c => !(c.root === prev.root && QUAL(c.type) === QUAL(prev.type)));
+    let cands = netCandidates(k, prev).filter(c => allowed.has(c.cat) && !(c.root === prev.root && QUAL(c.type) === QUAL(prev.type)));
+    // höchstens ein leiterfremder Akkord pro Phrase (außer bei „Überraschend“)
+    if (st.name !== 'Überraschend' && out.some(o => o.cat && o.cat !== 'dia')) cands = cands.filter(c => c.cat === 'dia' || (QUAL(prev.type) === 'dom' && c.cat === 'dia'));
     if (st.noDim) cands = cands.filter(c => QUAL(c.type) !== 'dim');
     cands = cands.filter(c => !(c.root === tonic.root && QUAL(c.type) === QUAL(tonic.type)));   // Tonika erst wieder am Phrasenanfang
+    if (!cands.length) cands = netCandidates(k, prev).filter(c => c.cat === 'dia' && !(c.root === prev.root && QUAL(c.type) === QUAL(prev.type)));
     const T = tensionTarget(i, len, mood);
     cands.forEach(c => {
       c.w = scoreLink(k, prev, c, mood, T);
@@ -873,7 +887,9 @@ const IDIOMS = {
 // Variation: mit etwas Wahrscheinlichkeit Akkorde durch Netzwerk-Farben ersetzen
 function varyPhrase(st, k, ph){
   const mood = st.net, out = ph.map(c => ({...c}));
+  let changed = 0;
   for (let i = 0; i < out.length; i++){
+    if (changed >= 1 && st.name !== 'Überraschend') break;           // höchstens eine Änderung pro Phrase
     if (Math.random() > (st.vary || 0.25)) continue;
     const next = out[(i + 1) % out.length], c = out[i];
     const opts = [];
@@ -883,7 +899,7 @@ function varyPhrase(st, k, ph){
     if ((mood.cat.nr || 0) > 0.2){ const q = QUAL(c.type); if (q === 'maj') opts.push({w:mood.cat.nr, c:{root:(c.root + 4) % 12, type:TI('m'), cat:'nr'}}); }
     if (i === 0 || !opts.length) continue;                 // der Phrasenanfang bleibt
     let r = Math.random() * opts.reduce((a, o) => a + o.w, 0);
-    for (const o of opts){ r -= o.w; if (r <= 0){ if (!(o.c.root === next.root && o.c.type === next.type)) out[i] = o.c; break; } }
+    for (const o of opts){ r -= o.w; if (r <= 0){ if (!(o.c.root === next.root && o.c.type === next.type)){ out[i] = o.c; changed++; } break; } }
   }
   return out;
 }
@@ -894,7 +910,7 @@ function idiomPhrase(st, k, styleName){
   return tpl.split(' ').map(t => parseRoman(k, t)).filter(Boolean);
 }
 function generate(seconds, styleName, key, exactBeats){
-  const st = STYLES[styleName];
+  const st = STYLES[styleName]; st.name = styleName;
   let k = {...key};
   if (st.mode && st.mode !== k.mode) k = st.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
   let beats = st.beats[Math.floor(Math.random() * st.beats.length)];
@@ -1256,10 +1272,12 @@ function release(){
 }
 let chordHist = [], keyFixed = null;
 // Tonart: fest gewählt, sonst aus den Loop-Akkorden (wenn vorhanden) bzw. den zuletzt gespielten
+let keyMemo = null;
 function currentKey(){
   if (keyFixed) return keyFixed;
   const loopChords = steps.filter(x => x.root != null).map(x => ({root:x.root, type:x.type}));
-  return loopChords.length ? guessKey(loopChords.slice(0, 16), true) : guessKey(chordHist);
+  const k = loopChords.length ? guessKey(loopChords.slice(0, 16), true, keyMemo) : guessKey(chordHist, false, keyMemo);
+  keyMemo = k; return k;
 }
 function updateHarmony(){
   const k = currentKey();
@@ -2303,7 +2321,7 @@ function renderFocusTypes(){
   const showAll = focusMoreTypes || curType >= BASIC_TYPES;
   CHORDS.forEach((c, i) => {
     if (!showAll && i >= BASIC_TYPES) return;
-    const b = document.createElement('button'); b.textContent = c.label === 'Dur' ? 'maj' : c.label === 'Moll' ? 'm' : c.label;
+    const b = document.createElement('button'); b.textContent = c.label;
     if (i === curType) b.className = 'sel';
     b.addEventListener('pointerdown', e => { e.preventDefault(); typeDown(i); renderFocusTypes(); });
     els.fTypes.append(b);
@@ -2852,7 +2870,7 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','Bewegung im Akkord':'Movement in chord','+ Bewegung hinzufügen':'+ Add movement','Andere Stimme':'Other voice','✕ Entfernen':'✕ Remove',
+  'Leeren':'Clear','Takt':'Bar','als':'next','Nächstes:':'chord:','hierher:':'here:','Bewegung im Akkord':'Movement in chord','+ Bewegung hinzufügen':'+ Add movement','Andere Stimme':'Other voice','✕ Entfernen':'✕ Remove',
   'Eine Stimme wandert mitten im Takt zu einem anderen Ton':'A voice moves to another note in the middle of the bar','Zielton tiefer':'Target note lower','Zielton höher':'Target note higher',
   'Bewegung auf die nächste Stimme legen':'Move the movement to the next voice','Keine Bewegung in diesem Takt':'No movement in this bar','Anzeige':'Display','automatisch':'automatic','volles Leuchten':'full glow','sparsam (gegen Knistern)':'light (prevents crackling)','Über & Lizenzen':'About & licenses',
 };
