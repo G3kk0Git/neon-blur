@@ -489,7 +489,13 @@ const SHARP_DISP = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','
 const FLAT_DISP  = ['C','D♭','D','E♭','E','F','G♭','G','A♭','A','B♭','B'];
 let spellFlat = false;            // B-Tonarten: B♭ statt A♯
 let spellScale = null, spellRoot = 0;   // leiterfremde Töne: ♭II ♭III ♭V ♭VI ♭VII mit ♭, sonst mit ♯
+// Wenn du einen Ton bewusst mit ♯ oder ♭ eingibst, wird er überall so geschrieben
+let accPref = {};
+try { accPref = (JSON.parse(localStorage.getItem('chordwave.v1') || '{}') || {}).accPref || {}; } catch(e){}
+function setAccPref(pc, d){ pc = ((pc % 12) + 12) % 12; if (!SHARP_DISP[pc].includes('♯')) return; accPref[pc] = d; }
 const noteDisp = pc => { pc = ((pc % 12) + 12) % 12;
+  if (accPref[pc] === 1) return SHARP_DISP[pc];
+  if (accPref[pc] === -1) return FLAT_DISP[pc];
   if (spellScale && !spellScale.has(pc)) return [1,3,6,8,10].includes((pc - spellRoot + 12) % 12) ? FLAT_DISP[pc] : SHARP_DISP[pc];
   return (spellFlat ? FLAT_DISP : SHARP_DISP)[pc]; };
 // Akkordtöne nach Intervall buchstabieren (E7: G♯, nicht A♭)
@@ -1203,7 +1209,7 @@ function save(){
   saveTimer = setTimeout(saveNow, 300);
 }
 function saveNow(){
-  try { localStorage.setItem(STORE, JSON.stringify({p:P, steps, latch, seed:loopSeed, bars:barsPref, preset: els.preset ? els.preset.value : undefined})); } catch(e){}
+  try { localStorage.setItem(STORE, JSON.stringify({p:P, steps, latch, seed:loopSeed, bars:barsPref, accPref, preset: els.preset ? els.preset.value : undefined})); } catch(e){}
 }
 
 /* ---------- Audio-Kontext ---------- */
@@ -1904,15 +1910,15 @@ window.addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
   if (e.code === 'Space'){ e.preventDefault(); if (e.repeat) return;
     if (sounding) stopAll(); else if (curRoot != null) playChord(curRoot, curType, true); return; }
-  if (key === 'x'){ mod.sharp = true; if (!e.repeat && lastLetter && performance.now() - lastLetter.t < 600){ const r = (lastLetter.pc + 1) % 12; lastLetter = null; playChord(r, curType, true); replaceLastRec(r); } return; }
-  if (key === 'z' || key === 'y'){ mod.flat = true; if (!e.repeat && lastLetter && performance.now() - lastLetter.t < 600){ const r = (lastLetter.pc + 11) % 12; lastLetter = null; playChord(r, curType, true); replaceLastRec(r); } return; }
+  if (key === 'x'){ mod.sharp = true; if (!e.repeat && lastLetter && performance.now() - lastLetter.t < 600){ const r = (lastLetter.pc + 1) % 12; lastLetter = null; setAccPref(r, 1); playChord(r, curType, true); replaceLastRec(r); } return; }
+  if (key === 'z' || key === 'y'){ mod.flat = true; if (!e.repeat && lastLetter && performance.now() - lastLetter.t < 600){ const r = (lastLetter.pc + 11) % 12; lastLetter = null; setAccPref(r, -1); playChord(r, curType, true); replaceLastRec(r); } return; }
   if (e.repeat) return;
   if (key === 'q'){ setOctave(P.octave - 1); return; }
   if (key === 'w'){ setOctave(P.octave + 1); return; }
   if (key in LETTER_PC){
     e.preventDefault();
     let pc = LETTER_PC[key];
-    if (e.shiftKey || mod.sharp) pc = (pc + 1) % 12; else if (mod.flat) pc = (pc + 11) % 12;
+    if (e.shiftKey || mod.sharp){ pc = (pc + 1) % 12; setAccPref(pc, 1); } else if (mod.flat){ pc = (pc + 11) % 12; setAccPref(pc, -1); }
     lastLetter = {pc, t:performance.now()};
     rootBtns[pc].classList.add('hit'); held.add('k' + pc); keyRoot[key] = pc; playChord(pc, curType);
     return;
@@ -2253,13 +2259,13 @@ function renderFocusRoots(){
   // ♭/♯ verändert den zuletzt gesetzten Akkord (wie X/Z direkt nach dem Buchstaben);
   // ist noch keiner gesetzt, gilt es für den nächsten Buchstaben
   const acc = (d) => {
-    if (lastWrite && curRoot != null){ const r = (curRoot + d + 12) % 12; playChord(r, curType, true); rewriteLast(r, null); }
+    if (lastWrite && curRoot != null){ const r = (curRoot + d + 12) % 12; setAccPref(r, d); playChord(r, curType, true); rewriteLast(r, null); }
     else { focusArm = focusArm === d ? 0 : d; renderFocusRoots(); }
   };
   mk('♭', 'acc' + (focusArm === -1 ? ' armed' : ''), () => acc(-1));
   F_LETTERS.forEach(([l, pc]) => {
     const isSel = curRoot != null && noteDisp(curRoot)[0] === l;
-    const b = mk(l, isSel ? 'sel' : '', () => { const r = (pc + focusArm + 12) % 12; focusArm = 0; playChord(r, curType); });
+    const b = mk(l, isSel ? 'sel' : '', () => { const r = (pc + focusArm + 12) % 12; if (focusArm) setAccPref(r, focusArm); focusArm = 0; playChord(r, curType); });
     b.addEventListener('pointerup', () => { if (!latch && !looping) release(); });
   });
   mk('♯', 'acc' + (focusArm === 1 ? ' armed' : ''), () => acc(1));
