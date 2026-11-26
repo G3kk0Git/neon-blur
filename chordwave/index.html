@@ -1374,7 +1374,11 @@ function buildLoopEvents(st, p){
       out.push({b, k, kind:'chord', root:s.root, type:s.type, notes:notes.slice(), bass, boff, offs, glides, L, chg, bglide: gl});
       lastNotes = notes.slice();
       const doMove = x.move === true ? L >= 2 : x.move === false ? false : (p.motion > 0 && L >= 4 && srand(kk, 99) < p.motion);
-      if (doMove){
+      if (x.mv && x.move !== false && L >= 1){             // selbst eingestellte Bewegung
+        const i = Math.min(x.mv.i, n - 1), at = Math.max(0.25, Math.min(L - 0.25, x.mv.at));
+        out.push({b: b + at, k, kind:'move', i, note:x.mv.note, glide:Math.max(0.15, p.glide * 1.2), custom:true});
+        lastNotes[i] = x.mv.note; if (!(x.pitch && x.pitch[i] != null)) vl.prev[i] = x.mv.note;
+      } else if (doMove){
         const mv = innerMove(notes, s.root, s.type, kk);
         if (mv){ out.push({b: b + L / 2 + srand(kk, 98) * 0.5 * Math.min(1, L / 4), k, kind:'move', i:mv.i, note:mv.note, glide:Math.max(0.15, p.glide * 1.2)});
           lastNotes[mv.i] = mv.note; if (!(x.pitch && x.pitch[mv.i] != null)) vl.prev[mv.i] = mv.note; }
@@ -2422,7 +2426,7 @@ function renderDetail(){
   els.fvStagger.value = P.stagger; els.fvMotion.value = P.motion; els.fvGlideAll.value = P.glide;
   const x0 = s.x || {};
   els.fvGlide.textContent = '〰 Gleiten: ' + (x0.noglide ? 'aus' : 'an'); els.fvGlide.classList.toggle('on', !!x0.noglide);
-  const x = s.x || {}, custom = (x.offs && Object.keys(x.offs).length) || (x.pitch && Object.keys(x.pitch).length) || x.bass != null || x.boff != null;
+  const x = s.x || {}, custom = (x.offs && Object.keys(x.offs).length) || (x.pitch && Object.keys(x.pitch).length) || x.bass != null || x.boff != null || x.mv;
   els.fVoiceInfo.textContent = custom ? 'Eigene Einstellungen sind lila markiert.' : 'Noch automatisch – ändere Höhe oder Einsatz einzelner Stimmen.';
   els.fvSync.classList.toggle('on', !!x.sync && !(x.offs && Object.keys(x.offs).length));
   els.fvMove.textContent = '↝ Bewegung: ' + (x.move === true ? 'an' : x.move === false ? 'aus' : 'auto');
@@ -2458,6 +2462,50 @@ function renderVoiceGrid(){
     ent.append(l, val, rr);
     grid.append(nm, pitch, ent);
   });
+  renderMoveRow(grid, s, ev, nameOf);
+}
+// Bewegung im Akkord: aktuelle (automatische oder eigene) Bewegung dieses Takts
+function detailMove(){
+  const e = ensureEvents().events.find(x => x.kind === 'move' && x.k === detailK); if (!e) return null;
+  const ev = detailEvent(); return ev ? {i:e.i, note:e.note, at:e.b - ev.b, custom:!!e.custom} : null;
+}
+function moveCands(s, ev, vi){ const base = ev.notes[Math.min(vi, ev.notes.length - 1)]; return voiceCands(s, base); }
+function setMove(patch){
+  const ev = detailEvent(); if (!ev) return;
+  const cur = detailMove() || {i: ev.notes.length - 1, note: ev.notes[ev.notes.length - 1], at: ev.L / 2};
+  const x = stepX(detailK);
+  x.mv = {i:cur.i, note:cur.note, at:cur.at, ...patch};
+  if (x.move === false) delete x.move;
+  markLoopDirty();
+}
+function nextChordTone(s, n, dir){ const pcs = new Set(chordPcs(s.root, s.type)); let m = n + dir; while (Math.abs(m - n) < 13 && !pcs.has(((m % 12) + 12) % 12)) m += dir; return m; }
+function renderMoveRow(grid, s, ev, nameOf){
+  const mv = detailMove(), maxAt = Math.max(0.25, ev.L - 0.25);
+  const head = document.createElement('div'); head.className = 'h'; head.style.gridColumn = '1 / -1'; head.style.marginTop = '8px';
+  head.textContent = 'Bewegung im Akkord'; grid.append(head);
+  const btn = (t, title, fn) => { const b = document.createElement('button'); b.textContent = t; b.title = title; b.addEventListener('click', () => { pushUndo(); fn(); save(); renderDetail(); }); return b; };
+  if (!mv){
+    const add = btn('+ Bewegung hinzufügen', 'Eine Stimme wandert mitten im Takt zu einem anderen Ton', () => {
+      const top = ev.notes.length - 1; setMove({i: top, note: nextChordTone(s, ev.notes[top], 1), at: ev.L / 2});
+    });
+    add.style.gridColumn = '1 / -1'; grid.append(add); return;
+  }
+  const nm = document.createElement('div'); nm.className = 'nm' + (mv.custom ? ' own' : '');
+  const dot = document.createElement('i'); dot.style.background = VOICE_COLORS[mv.i];
+  const lab = document.createElement('span'); lab.textContent = nameOf(ev.notes[mv.i]) + ' → ' + nameOf(mv.note); nm.append(dot, lab);
+  const pitch = document.createElement('div'); pitch.className = 'stp';
+  const cand = moveCands(s, ev, mv.i), ci = cand.indexOf(mv.note);
+  const dn = btn('▼', 'Zielton tiefer', () => setMove({note: cand[Math.max(0, ci - 1)]})), up = btn('▲', 'Zielton höher', () => setMove({note: cand[Math.min(cand.length - 1, ci + 1)]}));
+  pitch.append(dn, up);
+  const when = document.createElement('div'); when.className = 'stp';
+  const val = document.createElement('span'); val.textContent = 'Schlag ' + (Math.round((mv.at + 1) * 4) / 4).toString().replace('.', ',');
+  when.append(btn('◀', 'früher', () => setMove({at: Math.max(0.25, mv.at - 0.25)})), val, btn('▶', 'später', () => setMove({at: Math.min(maxAt, mv.at + 0.25)})));
+  grid.append(nm, pitch, when);
+  const row = document.createElement('div'); row.className = 'row'; row.style.gridColumn = '1 / -1';
+  row.append(
+    btn('Andere Stimme', 'Bewegung auf die nächste Stimme legen', () => { const i = (mv.i + 1) % ev.notes.length; setMove({i, note: nextChordTone(s, ev.notes[i], 1)}); }),
+    btn('✕ Entfernen', 'Keine Bewegung in diesem Takt', () => { const x = stepX(detailK); delete x.mv; x.move = false; markLoopDirty(); }));
+  grid.append(row);
 }
 function setVoicePitch(j, m){ const x = stepX(detailK); if (j === 'bass') x.bass = m; else { if (!x.pitch) x.pitch = {}; x.pitch[j] = m; } markLoopDirty(); }
 function setVoiceOff(j, o){ const x = stepX(detailK); if (j === 'bass') x.boff = o; else { if (!x.offs) x.offs = {}; x.offs[j] = o; delete x.sync; } markLoopDirty(); }
@@ -2525,16 +2573,21 @@ function drawDetail(){
   const pcsName = m => (pcs.has(((m % 12) + 12) % 12) ? toneName(ev.root, ev.type, m) : noteDisp(m)) + (Math.floor(m / 12) - 1);
   const items = ev.notes.map((m, j) => ({j, m, off:ev.offs[j], col:VOICE_COLORS[j]}));
   if (P.bass) items.push({j:'bass', m:ev.bass, off:ev.boff || 0, col:BASS_COLOR});
-  // Griffe, die fast übereinanderliegen, leicht nach rechts versetzen
+  const mvE = detailMove();
+  if (mvE) items.push({j:'move', m:mvE.note, off:mvE.at, col:VOICE_COLORS[mvE.i], vi:mvE.i});
   // Griff dort, wo die Stimme ihren Ton erreicht (Einsatz + Gleitzeit) – so liegt er auf der Linie
-  items.forEach(it => { const gl = (it.j === 'bass' ? (ev.bglide ?? P.glide) : ev.glides[it.j]) / spb; it.hx = X(b0 + Math.min(ev.L, it.off + gl)); it.hy = Y(it.m); });
+  items.forEach(it => { const gl = (it.j === 'bass' ? (ev.bglide ?? P.glide) : it.j === 'move' ? Math.max(0.15, P.glide * 1.2) : ev.glides[it.j]) / spb; it.hx = X(b0 + Math.min(ev.L, it.off + gl)); it.hy = Y(it.m); });
   for (const it of items){
     const hx = it.hx, hy = it.hy, drag = detailDrag && detailDrag.j === it.j;
     detailHandles.push({...it, x:hx, y:hy});
-    g.beginPath(); g.arc(hx, hy, drag ? 13 : 10, 0, Math.PI * 2); g.fillStyle = '#07060c'; g.fill(); g.lineWidth = 3; g.strokeStyle = it.col; g.stroke();
+    const R = drag ? 13 : 10;
+    g.beginPath();
+    if (it.j === 'move'){ g.moveTo(hx, hy - R - 2); g.lineTo(hx + R + 2, hy); g.lineTo(hx, hy + R + 2); g.lineTo(hx - R - 2, hy); g.closePath(); }
+    else g.arc(hx, hy, R, 0, Math.PI * 2);
+    g.fillStyle = '#07060c'; g.fill(); g.lineWidth = 3; g.strokeStyle = it.col; g.stroke();
   }
   // Tonnamen rechts neben dem Takt, sortiert und ohne Überlappung
-  const labs = items.map(it => ({y:it.hy, col:it.col, txt:(it.j === 'bass' ? 'Bass ' : '') + pcsName(it.m) + (it.off ? ' +' + fmtBeats(it.off).replace(' Schl.', '') : '')})).sort((p, q) => p.y - q.y);
+  const labs = items.filter(it => it.j !== 'move').map(it => ({y:it.hy, col:it.col, txt:(it.j === 'bass' ? 'Bass ' : '') + pcsName(it.m) + (mvE && it.j === mvE.i ? ' → ' + pcsName(mvE.note) : '') + (it.off ? ' +' + fmtBeats(it.off).replace(' Schl.', '') : '')})).sort((p, q) => p.y - q.y);
   for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 15) labs[i].y = labs[i - 1].y + 15;
   g.font = '600 11px system-ui'; g.textBaseline = 'middle';
   const lx = Math.min(X(b1) + 8, w - 70);
@@ -2550,6 +2603,7 @@ els.dGraph.addEventListener('pointerdown', e => {
   const s = steps[detailK], ev = detailEvent();
   detailDrag = {j:best.j, id:e.pointerId, x0:px, y0:py, off0:best.off, m0:best.m, mode:null, moved:false,
     cand: best.j === 'bass' ? bassCands(s, best.m) : voiceCands(s, best.m), L:ev.L};
+  if (best.j === 'move') detailDrag.cand = moveCands(s, ev, best.vi);
 });
 els.dGraph.addEventListener('pointermove', e => {
   const d = detailDrag; if (!d || e.pointerId !== d.id) return;
@@ -2560,6 +2614,12 @@ els.dGraph.addEventListener('pointermove', e => {
   d.moved = true;
   const lv = ensureEvents(), ev = detailEvent(); if (!ev) return;
   const from = Math.max(0, ev.b - 1), to = Math.min(lv.beats, ev.b + ev.L + 1), pxPerBeat = (r.width - 110) / (to - from);
+  if (d.j === 'move'){
+    if (d.mode === 'x') setMove({at: Math.max(0.25, Math.min(d.L - 0.25, Math.round((d.off0 + dx / pxPerBeat) * 4) / 4))});
+    else { const i0 = Math.max(0, d.cand.indexOf(d.m0)), i = Math.max(0, Math.min(d.cand.length - 1, i0 + Math.round(-dy / 14)));
+      const m = d.cand[i]; if (m !== d.lastM){ d.lastM = m; setMove({note: m}); } }
+    return;
+  }
   if (d.mode === 'x'){
     const off = Math.max(0, Math.min(Math.floor(d.L * 0.95 * 4) / 4, Math.round((d.off0 + dx / pxPerBeat) * 4) / 4));
     setVoiceOff(d.j, off);
@@ -2792,7 +2852,9 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','Anzeige':'Display','automatisch':'automatic','volles Leuchten':'full glow','sparsam (gegen Knistern)':'light (prevents crackling)','Über & Lizenzen':'About & licenses',
+  'Leeren':'Clear','Takt':'Bar','Bewegung im Akkord':'Movement in chord','+ Bewegung hinzufügen':'+ Add movement','Andere Stimme':'Other voice','✕ Entfernen':'✕ Remove',
+  'Eine Stimme wandert mitten im Takt zu einem anderen Ton':'A voice moves to another note in the middle of the bar','Zielton tiefer':'Target note lower','Zielton höher':'Target note higher',
+  'Bewegung auf die nächste Stimme legen':'Move the movement to the next voice','Keine Bewegung in diesem Takt':'No movement in this bar','Anzeige':'Display','automatisch':'automatic','volles Leuchten':'full glow','sparsam (gegen Knistern)':'light (prevents crackling)','Über & Lizenzen':'About & licenses',
 };
 // Texte mit Zahlen/Namen
 const EN_RX = [
@@ -2813,7 +2875,7 @@ const EN_RX = [
   [/^Tempo: (\d+) BPM$/, 'Tempo: $1 BPM'],
   [/^↝ Bewegung: (auto|an|aus)$/, (m, v) => '↝ Movement: ' + {auto:'auto', an:'on', aus:'off'}[v]],
   [/^〰 Gleiten: (an|aus)$/, (m, v) => '〰 Glide: ' + (v === 'an' ? 'on' : 'off')],
-  [/^Neo-Riemann ([PLR])$/, 'Neo-Riemann $1'],
+  [/^Neo-Riemann ([PLR])$/, 'Neo-Riemann $1'], [/^Schlag ([\d,]+)$/, 'Beat $1'],
   [/^Prog-House: (.+)$/, 'Prog-House: $1'],
   [/^(.+) \((\d+)\)$/, (m, n, b) => EN[n] ? `${EN[n]} (${b})` : m],
 ];
