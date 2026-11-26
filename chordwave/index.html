@@ -332,6 +332,9 @@ body.focus #focus{display:block}
         <label><select id="arpRate"><option value="2">1/8</option><option value="4">1/16</option></select></label>
       </div>
       <div class="row">
+        <label>Anzeige <select id="fxSel"><option value="auto">automatisch</option><option value="full">volles Leuchten</option><option value="low">sparsam (gegen Knistern)</option></select></label>
+      </div>
+      <div class="row">
         <label>Audio <select id="latency">
           <option value="playback">stabil (empfohlen)</option><option value="balanced">ausgewogen</option><option value="interactive">schnell (kann knistern)</option></select></label>
       </div>
@@ -1073,8 +1076,9 @@ class Engine{
     const p = this.p; if (!(p.fenv > 0)) return;
     const f = this.filter.frequency;
     ramp(f, t);
-    f.setValueAtTime(Math.min(16000, p.cutoff * (1 + p.fenv * 7)), t);
-    f.setTargetAtTime(p.cutoff, t + 0.005, Math.max(0.02, dec / 3));
+    // kurz hochfahren statt springen (ein harter Sprung klickt hörbar)
+    f.linearRampToValueAtTime(Math.min(16000, p.cutoff * (1 + p.fenv * 7)), t + 0.006);
+    f.setTargetAtTime(p.cutoff, t + 0.008, Math.max(0.02, dec / 3));
   }
   // Arpeggiator: nur eine Stimme gleichzeitig offen
   arpStep(t, step, dur){
@@ -1087,8 +1091,8 @@ class Engine{
     for (let i = 0; i < MAX_VOICES; i++){
       const ag = this.voices[i].ag.gain;
       ramp(ag, t);
-      if (i === idx){ ag.setTargetAtTime(1, t, 0.003); ag.setTargetAtTime(0, t + dur * 0.55, dur * 0.18); }
-      else ag.setTargetAtTime(0, t, 0.004);
+      if (i === idx){ ag.setTargetAtTime(1, t, 0.006); ag.setTargetAtTime(0, t + dur * 0.55, dur * 0.2); }
+      else ag.setTargetAtTime(0, t, 0.008);
     }
     this.filterEnv(t, dur * 1.5);
   }
@@ -1097,8 +1101,8 @@ class Engine{
     const p = this.p; if (!(p.pump > 0)) return;
     const g = this.pump.gain;
     ramp(g, t);
-    g.linearRampToValueAtTime(1 - p.pump * 0.85, t + 0.012);
-    g.setTargetAtTime(1, t + 0.03, spb * 0.17);
+    g.linearRampToValueAtTime(1 - p.pump * 0.85, t + 0.025);
+    g.setTargetAtTime(1, t + 0.04, spb * 0.17);
   }
   drum(kind, t, vel){
     const c = this.ctx, out = this.drumBus;
@@ -1146,7 +1150,7 @@ class Engine{
 const DEFAULTS = {wave:'sawtooth', detune:10, voices:4, octave:0, glide:0.35, attack:0.08, decay:0.6, sustain:0.8, release:1.2,
   retrig:false, cutoff:1800, res:3, lfoRate:0.25, lfoDepth:0.15, verbMix:0.35, verbSize:3, delMix:0.12, delFb:0.35, delBeats:0.75,
   bass:true, bassLevel:0.6, volume:0.7, strum:0, stagger:0.15, motion:0.15, fenv:0, pump:0, arp:'off', arpRate:4,
-  bpm:90, latency:'playback', beat:'off', beatVol:0.7};
+  bpm:90, latency:'playback', beat:'off', beatVol:0.7, fx:'auto'};
 const PRESETS = {
   'Weiches Pad': {},
   'Glas-Keys': {wave:'triangle', detune:4, glide:0.15, attack:0.005, decay:0.9, sustain:0.35, release:1.4, retrig:true, cutoff:5000, res:1, lfoDepth:0, verbMix:0.3, delMix:0.18},
@@ -1668,6 +1672,12 @@ const BASS_COLOR = '#b18cff';
 function hexMix(hex, f){ const n = parseInt(hex.slice(1), 16), r = n >> 16, g2 = (n >> 8) & 255, b = n & 255;
   return `rgb(${Math.round(r + (255 - r) * f)},${Math.round(g2 + (255 - g2) * f)},${Math.round(b + (255 - b) * f)})`; }
 function neonStroke(g, col, idx, scale = 1, dim = 1){
+  if (fxMode()){                                       // sparsam: ein Schein + Kern
+    g.save(); g.strokeStyle = col;
+    g.globalAlpha = 0.18 * dim; g.lineWidth = 9 * scale; g.stroke();
+    g.globalAlpha = 0.95 * dim; g.lineWidth = 2.6 * scale; g.stroke();
+    g.restore(); return;
+  }
   const t = performance.now() / 1000, shimmer = 0.82 + 0.18 * Math.sin(t * 2.1 + idx * 1.7) * Math.sin(t * 0.73 + idx);
   g.save();
   g.globalCompositeOperation = 'lighter'; g.strokeStyle = col;
@@ -1684,9 +1694,18 @@ function fitCanvas(cv){
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   return {g, w, h};
 }
-function draw(){
+// Anzeige: höchstens ~40 Bilder/s; wird das Zeichnen zu teuer, automatisch sparsamer (schützt den Ton vor Knistern)
+let lastDraw = 0, drawCost = 0, lowFx = false;
+function fxMode(){ return P.fx === 'low' ? true : P.fx === 'full' ? false : lowFx; }
+function draw(now){
   requestAnimationFrame(draw);
+  if (now - lastDraw < 24) return;
+  lastDraw = now;
+  if (document.hidden) return;
+  const t0 = performance.now();
   try { if (detailK >= 0) drawDetail(); else if (focusOn) drawFocus(); else { drawLines(); drawPiano(); } } catch(e){ hist.length = 0; viewLo = 52; viewHi = 76; console.error(e); }
+  drawCost = drawCost * 0.95 + (performance.now() - t0) * 0.05;
+  if (!lowFx && drawCost > 7) lowFx = true;           // schwaches Gerät: Leuchten vereinfachen
 }
 function drawLines(){
   const {g, w, h} = fitCanvas(els.scope);
@@ -2001,7 +2020,7 @@ function syncFront(){
 const USTORE = 'chordwave.presets';
 let userPresets = {};
 try { userPresets = JSON.parse(localStorage.getItem(USTORE) || '{}') || {}; } catch(e){}
-const SOUND_KEYS = Object.keys(DEFAULTS).filter(k => !['bpm','latency','beat','beatVol'].includes(k));
+const SOUND_KEYS = Object.keys(DEFAULTS).filter(k => !['bpm','latency','beat','beatVol','fx'].includes(k));
 function soundOf(p){ const o = {}; SOUND_KEYS.forEach(k => o[k] = p[k]); return o; }
 function fillPresets(sel){
   els.preset.innerHTML = '';
@@ -2021,9 +2040,9 @@ function fillPresets(sel){
 }
 function loadPreset(v){
   const bpm = P.bpm;
-  const latency = P.latency, oct = P.octave, beat = P.beat, beatVol = P.beatVol;
-  if (v.startsWith('b:')) Object.assign(P, DEFAULTS, PRESETS[v.slice(2)], {bpm, latency, beat, beatVol});
-  else if (v.startsWith('u:')) Object.assign(P, DEFAULTS, userPresets[v.slice(2)], {bpm, latency, beat, beatVol});
+  const latency = P.latency, oct = P.octave, beat = P.beat, beatVol = P.beatVol, fx = P.fx;
+  if (v.startsWith('b:')) Object.assign(P, DEFAULTS, PRESETS[v.slice(2)], {bpm, latency, beat, beatVol, fx});
+  else if (v.startsWith('u:')) Object.assign(P, DEFAULTS, userPresets[v.slice(2)], {bpm, latency, beat, beatVol, fx});
   lastOctave = oct;
   syncUI(); changed('preset');
 }
@@ -2071,6 +2090,9 @@ fillBeatSelect(els.beatSel);
 els.beatSel.addEventListener('change', () => setBeat(els.beatSel.value));
 els.beatVol.addEventListener('input', () => { P.beatVol = +els.beatVol.value; changed(); });
 els.beatTempo.addEventListener('click', () => { if (BEATS[P.beat]){ P.bpm = BEATS[P.beat].bpm; els.bpm.value = P.bpm; changed(); renderFocus(); toast('Tempo: ' + P.bpm + ' BPM'); } else toast('Erst ein Beat-Muster wählen.'); });
+els.fxSel = document.getElementById('fxSel');
+els.fxSel.value = P.fx || 'auto';
+els.fxSel.addEventListener('change', () => { P.fx = els.fxSel.value; save(); });
 els.arp.addEventListener('change', () => { P.arp = els.arp.value; els.preset.value = ''; changed(); });
 els.arpRate.addEventListener('change', () => { P.arpRate = +els.arpRate.value; els.preset.value = ''; changed(); });
 els.octDown.addEventListener('click', () => setOctave(P.octave - 1));
@@ -2770,7 +2792,7 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','Über & Lizenzen':'About & licenses',
+  'Leeren':'Clear','Takt':'Bar','Anzeige':'Display','automatisch':'automatic','volles Leuchten':'full glow','sparsam (gegen Knistern)':'light (prevents crackling)','Über & Lizenzen':'About & licenses',
 };
 // Texte mit Zahlen/Namen
 const EN_RX = [
