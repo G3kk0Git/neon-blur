@@ -132,6 +132,8 @@ body.focus #focus{display:block}
 .fbar .half+.half{border-left:1px solid var(--line)}
 .fbar .empty2{color:var(--dim);font-weight:400}
 .fbar.cur{border:2px solid var(--accent2)}
+.fbar.span{border:2px dashed var(--accent2)}
+.fbar.cont .half{color:var(--dim);font-weight:500;font-size:12px}
 .fbar.play{background:#232042;border-color:var(--accent)}
 .fbar .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:0}
 #fGraph{width:100%;height:150px;display:block;background:#07060c;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
@@ -390,7 +392,7 @@ body.focus #focus{display:block}
   <div class="ftypes" id="fTypes"></div>
   <div class="fctl">
     <select id="fBarsSel" title="Anzahl Takte"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="3">3 Takte</option><option value="4">4 Takte</option><option value="5">5 Takte</option><option value="6">6 Takte</option><option value="7">7 Takte</option><option value="8">8 Takte</option><option value="12">12 Takte</option><option value="16">16 Takte</option></select>
-    <select id="fLen" title="Länge eines neuen Akkords"><option value="4">1 Takt</option><option value="2">½ Takt</option></select>
+    <select id="fLen" title="Länge eines neuen Akkords"><option value="2">½ Takt</option><option value="4">1 Takt</option><option value="8" selected>2 Takte</option><option value="16">4 Takte</option></select>
     <label class="fadv"><input type="checkbox" id="fAdvance"> danach weiter</label>
     <span class="bpm"><button id="fBpmDown">−</button><span id="fBpm"></span><button id="fBpmUp">+</button></span>
     <select id="fBeat" title="Beat"></select>
@@ -2530,7 +2532,12 @@ function renderFocus(){
     const nm = c => c ? chordName(c.root, c.type) : '–';
     const same = (x, y) => (!x && !y) || (x && y && x.root === y.root && x.type === y.type);
     const parts = same(h1, h2) ? [h1] : [h1, h2];
-    parts.forEach(c => { const sp = document.createElement('span'); sp.className = 'half' + (c ? '' : ' empty2'); sp.textContent = nm(c); cell.append(sp); });
+    // Takt, der nur den Akkord aus dem vorigen Takt weiterklingen lässt → als Fortsetzung zeigen
+    const cont = b > 0 && h1 && parts.length === 1 && same(h1, g[b * 4 - 1]);
+    if (cont) cell.classList.add('cont');
+    const L = +els.fLen.value;
+    if (b !== curBar && L > 4 && b * 4 > focusCursor && b * 4 < focusCursor + L) cell.classList.add('span');
+    parts.forEach(c => { const sp = document.createElement('span'); sp.className = 'half' + (c ? '' : ' empty2'); sp.textContent = (cont ? '↳ ' : '') + nm(c); cell.append(sp); });
     const pr = document.createElement('i'); pr.className = 'prog'; cell.append(pr);
     cell.addEventListener('dblclick', () => openDetail(stepAtBeat(b * 4)));
     cell.addEventListener('click', e => {
@@ -2967,7 +2974,12 @@ els.fUndo.addEventListener('click', undo);
 els.fRedo.addEventListener('click', redo);
 els.fClear.addEventListener('click', () => { clearLoop(); focusCursor = 0; renderFocus(); });
 els.fBarsSel.addEventListener('change', () => { setBars(+els.fBarsSel.value); if (focusCursor >= barCount() * 4) focusCursor = 0; renderFocus(); });
-els.fLen.addEventListener('change', () => { focusCursor -= focusCursor % +els.fLen.value; renderFocus(); });
+try { const v = localStorage.getItem('chordwave.flen'); if (v && [...els.fLen.options].some(o => o.value === v)) els.fLen.value = v; } catch(e){}
+els.fLen.addEventListener('change', () => {
+  focusCursor -= focusCursor % Math.min(4, +els.fLen.value);
+  try { localStorage.setItem('chordwave.flen', els.fLen.value); } catch(e){}
+  renderFocus();
+});
 const bpmBy = d => { P.bpm = Math.max(40, Math.min(240, P.bpm + d)); els.bpm.value = P.bpm; changed(); renderFocus(); };
 els.fBpmDown.addEventListener('click', () => bpmBy(-2));
 els.fBpmUp.addEventListener('click', () => bpmBy(2));
@@ -3242,7 +3254,7 @@ const EN = {
   'Eigene Einstellungen dieses Takts entfernen':'Remove custom settings of this bar','Aufnahme stoppen':'Stop recording','Beat':'Beat',
   'tiefer':'lower','höher':'higher','früher':'earlier','später':'later',
   // Loop-Tab
-  'Tempo':'Tempo','BPM':'BPM','Takte':'Bars','Neue Akkorde':'New chords','1 Schlag':'1 beat','2 Schläge':'2 beats','1 Takt':'1 bar','2 Takte':'2 bars','½ Takt':'½ bar',
+  'Tempo':'Tempo','BPM':'BPM','Takte':'Bars','Neue Akkorde':'New chords','1 Schlag':'1 beat','2 Schläge':'2 beats','1 Takt':'1 bar','2 Takte':'2 bars','4 Takte':'4 bars','½ Takt':'½ bar',
   '+ Pause anhängen':'+ Add rest','Loop leeren':'Clear loop','↺ Zurücksetzen':'↺ Reset','Muster':'Pattern','Lautstärke':'Volume','kein Beat':'no beat',
   'Tempo des Beats übernehmen':'Use the beat’s tempo','Der Beat läuft mit, wenn der Loop spielt, und ist im WAV- und MIDI-Export enthalten.':'The beat plays along with the loop and is included in WAV and MIDI export.',
   'Generator':'Generator','Dauer':'Length','Stil':'Style','aktuelle':'current','zufällig':'random','Sound, Beat und Tempo passend zum Stil':'Sound, beat and tempo to match the style',
