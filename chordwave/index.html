@@ -283,7 +283,7 @@ body.focus #focus{display:block}
     <div class="box">
       <div class="row">
         <label>Tempo <input type="number" id="bpm" min="40" max="240" value="90"> BPM</label>
-        <label>Takte <select id="loopBars"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
+        <label>Takte <select id="loopBars"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>12</option><option>16</option></select></label>
         <label>Neue Akkorde <select id="stepBeats">
           <option value="1">1 Schlag</option><option value="2">2 Schläge</option>
           <option value="4" selected>1 Takt</option><option value="8">2 Takte</option></select></label>
@@ -307,7 +307,8 @@ body.focus #focus{display:block}
       <span class="lbl">Generator</span>
       <div class="row">
         <label>Dauer <select id="genDur">
-          <option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">1 min</option>
+          <option value="bars" selected>wie „Takte“ oben</option>
+          <option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option>
           <option value="120">2 min</option><option value="180">3 min</option></select></label>
         <label>Stil <select id="genStyle"></select></label>
         <label>Tonart <select id="genKey"><option value="cur">aktuelle</option><option value="rnd">zufällig</option></select></label>
@@ -388,7 +389,7 @@ body.focus #focus{display:block}
   <div class="froots" id="fRoots"></div>
   <div class="ftypes" id="fTypes"></div>
   <div class="fctl">
-    <select id="fBarsSel" title="Anzahl Takte"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="3">3 Takte</option><option value="4">4 Takte</option><option value="5">5 Takte</option><option value="6">6 Takte</option><option value="7">7 Takte</option><option value="8">8 Takte</option></select>
+    <select id="fBarsSel" title="Anzahl Takte"><option value="1">1 Takt</option><option value="2">2 Takte</option><option value="3">3 Takte</option><option value="4">4 Takte</option><option value="5">5 Takte</option><option value="6">6 Takte</option><option value="7">7 Takte</option><option value="8">8 Takte</option><option value="12">12 Takte</option><option value="16">16 Takte</option></select>
     <select id="fLen" title="Länge eines neuen Akkords"><option value="4">1 Takt</option><option value="2">½ Takt</option></select>
     <label class="fadv"><input type="checkbox" id="fAdvance"> danach weiter</label>
     <span class="bpm"><button id="fBpmDown">−</button><span id="fBpm"></span><button id="fBpmUp">+</button></span>
@@ -1596,7 +1597,7 @@ function renderSteps(){
 function syncBarsSelect(sel){
   const n = barCount();
   [...sel.querySelectorAll('option.extra')].forEach(o => o.remove());
-  if (n > 8){ const o = document.createElement('option'); o.className = 'extra'; o.value = n; o.textContent = n + ' Takte'; sel.append(o); }
+  if (![...sel.options].some(o => +o.value === n)){ const o = document.createElement('option'); o.className = 'extra'; o.value = n; o.textContent = n + ' Takte'; sel.append(o); }
   sel.value = n;
 }
 function renderStepEdit(){
@@ -2443,7 +2444,7 @@ els.loopResetBtn.addEventListener('click', () => {
   if (looping) stopLoop();
   pushUndo(); steps = []; selStep = -1; barsPref = 4;
   P.bpm = DEFAULTS.bpm; els.bpm.value = P.bpm; els.stepBeats.value = '4'; els.passes.value = '2';
-  els.genDur.value = '30'; els.genStyle.selectedIndex = 0; els.genKey.value = 'cur';
+  els.genDur.value = 'bars'; els.genStyle.selectedIndex = 0; els.genKey.value = 'cur';
   if (recording) els.recBtn.click();
   renderSteps(); changed(); toast('Loop zurückgesetzt.');
 });
@@ -2484,7 +2485,7 @@ function runGenerator(seconds, exactBeats){
   toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
   setTimeout(startLoop, 120);
 }
-els.genBtn.addEventListener('click', () => runGenerator(+els.genDur.value));
+els.genBtn.addEventListener('click', () => els.genDur.value === 'bars' ? runGenerator(0, barCount() * 4) : runGenerator(+els.genDur.value));
 try { els.genKit.checked = localStorage.getItem('chordwave.kit') !== '0'; } catch(e){ els.genKit.checked = true; }
 els.genKit.addEventListener('change', () => { try { localStorage.setItem('chordwave.kit', els.genKit.checked ? '1' : '0'); } catch(e){} });
 els.undoBtn.addEventListener('click', undo);
@@ -3289,7 +3290,7 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','maximal stabil (Bluetooth)':'maximum stability (Bluetooth)','Video fertig':'Video ready','📤 Teilen':'📤 Share','Schließen':'Close','eigene …':'custom …','1× Loop':'1× loop','2× Loop':'2× loop','4× Loop':'4× loop','6× Loop':'6× loop','8× Loop':'8× loop',
+  'Leeren':'Clear','Takt':'Bar','wie „Takte“ oben':'like “Bars” above','maximal stabil (Bluetooth)':'maximum stability (Bluetooth)','Video fertig':'Video ready','📤 Teilen':'📤 Share','Schließen':'Close','eigene …':'custom …','1× Loop':'1× loop','2× Loop':'2× loop','4× Loop':'4× loop','6× Loop':'6× loop','8× Loop':'8× loop',
   'Gespeichert in Dokumente/Drifting Chords.':'Saved to Documents/Drifting Chords.','Wie viele Loop-Durchläufe (oder Sekunden mit „s“, z. B. 45s)?':'How many loop passes (or seconds with “s”, e.g. 45s)?','Farben':'Colors','Eis':'Ice','Glut':'Ember','Lila':'Purple','TONART':'KEY','Erstellt mit':'Made with','Video gespeichert.':'Video saved.',
   'Video-Modus':'Video mode','Video aufnehmen':'Record video','Länge der Aufnahme':'Recording length','Dieser Browser kann keine Videos aufnehmen.':'This browser cannot record video.','Klang':'Sound','Ton':'Key','— eigener —':'— custom —','Raum':'Space','Stereo-Breite':'Stereo width','Chorus':'Chorus',
   'Instrument wechseln (Effekte und Loop bleiben)':'Change instrument (effects and loop stay)','Alles einen Halbton tiefer':'Everything one semitone down','Alles einen Halbton höher':'Everything one semitone up','Instrument':'Instrument',
