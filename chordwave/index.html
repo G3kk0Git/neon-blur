@@ -191,6 +191,11 @@ body.focus #focus{display:block}
 .vbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .vbar button,.vbar select{height:40px}
 #vRec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
+#vDone{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px}
+#vDone.on{display:flex}
+#vDone .vd{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;max-width:360px;width:100%;display:flex;flex-direction:column;gap:12px}
+#vDone h3{margin:0}
+#vDone .row button{flex:1;height:46px;font-size:16px}
 /* Speichern-Menü */
 #sheet{display:none;position:fixed;inset:0;z-index:8;background:rgba(0,0,0,.55);align-items:flex-end;justify-content:center}
 #sheet.on{display:flex}
@@ -440,9 +445,20 @@ body.focus #focus{display:block}
   <div class="vbar">
     <button id="vPlay" title="Loop abspielen">▶</button>
     <button id="vRec" class="rec" title="Video aufnehmen">⏺ Video</button>
-    <select id="vPasses" title="Länge der Aufnahme"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select>
+    <select id="vPasses" title="Länge der Aufnahme">
+      <option value="p1">1× Loop</option><option value="p2" selected>2× Loop</option><option value="p4">4× Loop</option><option value="p6">6× Loop</option><option value="p8">8× Loop</option>
+      <option value="s15">15 s</option><option value="s30">30 s</option><option value="s60">60 s</option><option value="custom">eigene …</option></select>
     <select id="vTheme" title="Farben"><option>Neon</option><option>Eis</option><option>Glut</option><option>Lila</option><option>Mono</option></select>
     <button id="vClose" title="schließen">✕</button>
+  </div>
+</div>
+
+<div id="vDone">
+  <div class="vd">
+    <h3>Video fertig</h3>
+    <p class="hint" id="vDoneInfo"></p>
+    <div class="row"><button id="vShare" class="on">📤 Teilen</button><button id="vSave">💾 Speichern</button></div>
+    <div class="row"><button id="vDoneClose">Schließen</button></div>
   </div>
 </div>
 
@@ -1650,12 +1666,42 @@ function stopLoop(){
 /* ---------- Export ---------- */
 const isNativeApp = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 function blobToBase64(blob){ return new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = fail; r.readAsDataURL(blob); }); }
+// Große Dateien (Videos) in Stücken schreiben – in einem Stück sprengen sie den Speicher der App-Brücke
+async function nativeWrite(blob, name, directory){
+  const {Filesystem} = window.Capacitor.Plugins, CH = 768 * 1024;   // durch 3 teilbar → saubere Base64-Stücke
+  let uri = null;
+  for (let off = 0; off < blob.size || off === 0; off += CH){
+    const data = await blobToBase64(blob.slice(off, off + CH));
+    if (off === 0){ const r = await Filesystem.writeFile({path: name, data, directory, recursive: true}); uri = r.uri; }
+    else await Filesystem.appendFile({path: name, data, directory});
+    if (blob.size === 0) break;
+  }
+  return uri;
+}
 async function nativeShare(blob, name){
-  const {Filesystem, Share} = window.Capacitor.Plugins;
-  const data = await blobToBase64(blob);
-  const res = await Filesystem.writeFile({path: name, data, directory: 'CACHE'});
-  try { await Share.share({title: name, files: [res.uri]}); }
-  catch(e){ if (!/cancel/i.test(String(e && e.message))) await Share.share({title: name, url: res.uri}); }
+  const {Share} = window.Capacitor.Plugins;
+  const uri = await nativeWrite(blob, name, 'CACHE');
+  try { await Share.share({title: name, files: [uri]}); }
+  catch(e){ if (!/cancel/i.test(String(e && e.message))) await Share.share({title: name, url: uri}); }
+}
+// Teilen: App → Android-Teilen-Menü, Browser → Web-Share (falls möglich), sonst herunterladen
+async function shareFile(blob, name){
+  if (isNativeApp()) return nativeShare(blob, name);
+  const file = new File([blob], name, {type: blob.type});
+  if (navigator.canShare && navigator.canShare({files: [file]})){
+    try { await navigator.share({files: [file], title: 'Drifting Chords'}); return; }
+    catch(e){ if (e && e.name === 'AbortError') return; }
+  }
+  download(blob, name);
+}
+// Speichern: App → Ordner „Documents/Drifting Chords“ (sonst Teilen), Browser → Download
+async function saveFile(blob, name){
+  if (isNativeApp()){
+    try { await nativeWrite(blob, 'Drifting Chords/' + name, 'DOCUMENTS'); toast(tr('Gespeichert in Dokumente/Drifting Chords.')); }
+    catch(e){ await nativeShare(blob, name); }
+    return;
+  }
+  download(blob, name);
 }
 function download(blob, name){
   if (isNativeApp()){ toast('Datei wird geteilt …'); nativeShare(blob, name).catch(e => toast('Fehler: ' + (e && e.message || e))); return; }
@@ -3010,8 +3056,8 @@ els.loopDel.addEventListener('click', () => {
 });
 
 /* ---------- Video-Modus: Hochformat-Ansicht zum Aufnehmen ---------- */
-var videoOn = false, vRecorder = null;
-['video','vCanvas','vPlay','vRec','vPasses','vTheme','vClose','videoBtn','fVideo','themeSel'].forEach(id => els[id] = document.getElementById(id));
+var videoOn = false, vRecorder = null, lastVideo = null;
+['video','vCanvas','vPlay','vRec','vPasses','vTheme','vClose','videoBtn','fVideo','themeSel','vDone','vDoneInfo','vShare','vSave','vDoneClose'].forEach(id => els[id] = document.getElementById(id));
 function drawWaves(g, x, y, w, col){            // kleines Logo
   g.save(); g.lineCap = 'round';
   for (let i = 0; i < 4; i++){ g.beginPath();
@@ -3067,18 +3113,32 @@ function startVideoRec(){
   const stream = new MediaStream([...els.vCanvas.captureStream(30).getVideoTracks(), ...dest.stream.getAudioTracks()]);
   const mime = ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
     .find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
-  const mr = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 6000000} : undefined);
-  const chunks = [];
+  // Länge: Durchläufe, Sekunden oder eigene Anzahl
+  let len = els.vPasses.value;
+  if (len === 'custom'){
+    const v = (prompt(tr('Wie viele Loop-Durchläufe (oder Sekunden mit „s“, z. B. 45s)?'), '3') || '').trim().toLowerCase();
+    if (!v){ try { engine.analyser.disconnect(dest); } catch(e){} return; }
+    len = v.endsWith('s') ? 's' + parseFloat(v) : 'p' + parseFloat(v);
+  }
+  const num = Math.max(1, Math.min(len[0] === 's' ? 600 : 50, parseFloat(len.slice(1)) || 1));
+  const ms = len[0] === 's' ? num * 1000 : loopSeconds() * num * 1000 + 1500;
+  let mr;
+  try { mr = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 5000000} : undefined); }
+  catch(e){ try { mr = new MediaRecorder(stream); } catch(e2){ toast(tr('Video-Aufnahme nicht möglich: ') + (e2.message || e2)); return; } }
+  const chunks = [], t0 = performance.now();
   mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  mr.onerror = e => toast(tr('Video-Aufnahme nicht möglich: ') + ((e.error && e.error.message) || 'unbekannt'));
   mr.onstop = () => {
     try { engine && engine.analyser.disconnect(dest); } catch(e){}
-    const type = mr.mimeType || 'video/webm', ext = type.includes('mp4') ? 'mp4' : 'webm';
-    download(new Blob(chunks, {type}), 'drifting-chords-video.' + ext);
-    toast(tr('Video gespeichert.'));
+    const type = (mr.mimeType || 'video/webm').split(';')[0], ext = type.includes('mp4') ? 'mp4' : 'webm';
+    if (!chunks.length){ toast(tr('Video-Aufnahme nicht möglich: ') + 'leer'); return; }
+    lastVideo = {blob: new Blob(chunks, {type}), name: 'drifting-chords-video.' + ext};
+    const sec = Math.round((performance.now() - t0) / 1000), mb = (lastVideo.blob.size / 1048576).toFixed(1);
+    els.vDoneInfo.textContent = `${sec} s · ${mb} MB · ${ext.toUpperCase()}`;
+    els.vDone.classList.add('on');
   };
   if (looping) stopLoop();
-  mr.start(500); startLoop();
-  const ms = loopSeconds() * +els.vPasses.value * 1000 + 1500;
+  mr.start(1000); startLoop();
   vRecorder = {mr, timer: setTimeout(stopVideoRec, ms)};
   els.vRec.classList.add('on'); els.vRec.textContent = '■ Stopp';
 }
@@ -3093,6 +3153,9 @@ els.fVideo.addEventListener('click', () => setVideo(true));
 els.vClose.addEventListener('click', () => setVideo(false));
 els.vPlay.addEventListener('click', () => looping ? stopLoop() : startLoop());
 els.vRec.addEventListener('click', () => vRecorder ? stopVideoRec() : startVideoRec());
+els.vShare.addEventListener('click', () => { if (lastVideo) shareFile(lastVideo.blob, lastVideo.name).catch(e => toast('Fehler: ' + (e && e.message || e))); });
+els.vSave.addEventListener('click', () => { if (lastVideo) saveFile(lastVideo.blob, lastVideo.name).catch(e => toast('Fehler: ' + (e && e.message || e))); });
+els.vDoneClose.addEventListener('click', () => els.vDone.classList.remove('on'));
 const setTheme = v => { P.theme = v; applyTheme(); save(); els.themeSel.value = v; els.vTheme.value = v; };
 els.vTheme.addEventListener('change', () => setTheme(els.vTheme.value));
 els.themeSel.value = P.theme || 'Neon';
@@ -3187,7 +3250,8 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','Farben':'Colors','Eis':'Ice','Glut':'Ember','Lila':'Purple','TONART':'KEY','Erstellt mit':'Made with','Video gespeichert.':'Video saved.',
+  'Leeren':'Clear','Takt':'Bar','Video fertig':'Video ready','📤 Teilen':'📤 Share','Schließen':'Close','eigene …':'custom …','1× Loop':'1× loop','2× Loop':'2× loop','4× Loop':'4× loop','6× Loop':'6× loop','8× Loop':'8× loop',
+  'Gespeichert in Dokumente/Drifting Chords.':'Saved to Documents/Drifting Chords.','Wie viele Loop-Durchläufe (oder Sekunden mit „s“, z. B. 45s)?':'How many loop passes (or seconds with “s”, e.g. 45s)?','Farben':'Colors','Eis':'Ice','Glut':'Ember','Lila':'Purple','TONART':'KEY','Erstellt mit':'Made with','Video gespeichert.':'Video saved.',
   'Video-Modus':'Video mode','Video aufnehmen':'Record video','Länge der Aufnahme':'Recording length','Dieser Browser kann keine Videos aufnehmen.':'This browser cannot record video.','Klang':'Sound','Ton':'Key','— eigener —':'— custom —','Raum':'Space','Stereo-Breite':'Stereo width','Chorus':'Chorus',
   'Instrument wechseln (Effekte und Loop bleiben)':'Change instrument (effects and loop stay)','Alles einen Halbton tiefer':'Everything one semitone down','Alles einen Halbton höher':'Everything one semitone up','Instrument':'Instrument',
   'Samt-Pad':'Velvet Pad','Sinus-Pad':'Sine Pad','Analog-Pad':'Analog Pad','Glocke':'Bell','Samt-Pad (weich)':'Velvet Pad (soft)','als':'next','Nächstes:':'chord:','hierher:':'here:','Bewegung im Akkord':'Movement in chord','+ Bewegung hinzufügen':'+ Add movement','Andere Stimme':'Other voice','✕ Entfernen':'✕ Remove',
@@ -3207,7 +3271,7 @@ const EN_RX = [
   [/^Sound „(.+)“ gespeichert\.$/, 'Sound “$1” saved.'], [/^Sound „(.+)“ löschen\?$/, 'Delete sound “$1”?'],
   [/^„(.+)“ gibt es schon\. Überschreiben\?$/, '“$1” already exists. Overwrite?'],
   [/^Aufnahme gespeichert \((\d+) s\)\.$/, 'Recording saved ($1 s).'], [/^Aufnahme konnte nicht gespeichert werden: (.*)$/, 'Recording could not be saved: $1'],
-  [/^WAV-Export fehlgeschlagen: (.*)$/, 'WAV export failed: $1'], [/^Fehler: (.*)$/, 'Error: $1'],
+  [/^WAV-Export fehlgeschlagen: (.*)$/, 'WAV export failed: $1'], [/^Fehler: (.*)$/, 'Error: $1'], [/^Video-Aufnahme nicht möglich: (.*)$/, 'Video recording not possible: $1'],
   [/^⏺ REC (\d+:\d+) – tippen zum Stoppen$/, '⏺ REC $1 – tap to stop'],
   [/^(.+) \((\d+) Akkorde, (\d+) BPM\)$/, '$1 ($2 chords, $3 BPM)'],
   [/^Tempo: (\d+) BPM$/, 'Tempo: $1 BPM'],
