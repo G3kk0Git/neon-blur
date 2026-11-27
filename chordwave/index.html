@@ -314,6 +314,10 @@ body.focus #focus{display:block}
           <option value="120">2 min</option><option value="180">3 min</option></select></label>
         <label>Stil <select id="genStyle"></select></label>
         <label>Tonart <select id="genKey"><option value="cur">aktuelle</option><option value="rnd">zufällig</option></select></label>
+        <label>Akkordlänge <select id="genLen"><option value="auto">je nach Stil</option><option value="4">1 Takt</option><option value="8" selected>2 Takte</option><option value="16">4 Takte</option></select></label>
+      </div>
+      <div class="row">
+        <label>Quelle <select id="genHit"><option value="">zufällig nach Stil</option></select></label>
       </div>
       <div class="row">
         <label><input type="checkbox" id="genKit"> Sound, Beat und Tempo passend zum Stil</label>
@@ -322,7 +326,7 @@ body.focus #focus{display:block}
         <button id="genBtn" class="on">✨ Abfolge erzeugen</button>
         <button id="undoBtn" disabled>↶ Rückgängig</button>
       </div>
-      <p class="hint">Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab.</p>
+      <p class="hint" data-en="Replaces the loop with a new progression of the length you choose (at the current tempo) and plays it. “Source” can also load famous hit progressions, transposed to your key.">Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab. Bei „Quelle“ kannst du auch berühmte Akkordfolgen aus Hits laden – in deiner Tonart.</p>
     </div>
     <div class="box">
       <span class="lbl">Export</span>
@@ -339,6 +343,7 @@ body.focus #focus{display:block}
     <div class="box">
       <div class="row">
         <label>Sprache <select id="langSel"><option value="de">Deutsch</option><option value="en">English</option></select></label>
+        <label>Figuren <select id="figSel"><option value="">keine</option><option value="cycle">Lichtrenner</option><option value="boat">Boote</option><option value="deer">Rentiere 🎄</option></select></label>
         <label>Farben <select id="themeSel"><option value="Neon">Neon</option><option value="Eis">Eis</option><option value="Glut">Glut</option><option value="Lila">Lila</option><option value="Mono">Mono</option></select></label>
         <label>Preset <select id="preset"></select></label>
       </div>
@@ -452,6 +457,7 @@ body.focus #focus{display:block}
     <select id="vPasses" title="Länge der Aufnahme">
       <option value="p1">1× Loop</option><option value="p2" selected>2× Loop</option><option value="p4">4× Loop</option><option value="p6">6× Loop</option><option value="p8">8× Loop</option>
       <option value="s15">15 s</option><option value="s30">30 s</option><option value="s60">60 s</option><option value="custom">eigene …</option></select>
+    <select id="vFig" title="Figuren"><option value="">–</option><option value="cycle">🏍</option><option value="boat">⛵</option><option value="deer">🦌</option></select>
     <select id="vTheme" title="Farben"><option>Neon</option><option>Eis</option><option>Glut</option><option>Lila</option><option>Mono</option></select>
     <button id="vClose" title="schließen">✕</button>
   </div>
@@ -960,6 +966,32 @@ function idiomPhrase(st, k, styleName){
   const tpl = list[Math.floor(Math.random() * list.length)];
   return tpl.split(' ').map(t => parseRoman(k, t)).filter(Boolean);
 }
+// Berühmte, eher ungewöhnliche Akkordfolgen aus Nummer-1-Hits (Akkordfolgen selbst sind nicht geschützt).
+// Stufen relativ zur Tonart, damit sie in jede Tonart passen; b = Schläge je Akkord
+const HITS = [
+  {n:'Hotel California', a:'Eagles', y:1977, mode:'min', bpm:74,  prog:'i V ♭VII IV ♭VI ♭III iv V', b:8, note:'Moll mit Dur-Dominante und Abstieg über alle Stufen'},
+  {n:'Yesterday', a:'The Beatles', y:1965, mode:'maj', bpm:96, prog:'I vii7 III7 vi IV V7 I I', b:4, note:'Zwischendominante III7 führt in die Parallele'},
+  {n:'Something', a:'The Beatles', y:1969, mode:'maj', bpm:66, prog:'I Imaj7 I7 IV II7 V I I', b:4, note:'absteigende Linie im Akkord + Doppeldominante'},
+  {n:'Hey Jude (Schluss)', a:'The Beatles', y:1968, mode:'maj', bpm:74, prog:'I ♭VII IV I', b:8, note:'geliehenes ♭VII – der berühmte Na-na-na-Teil'},
+  {n:'I Will Survive', a:'Gloria Gaynor', y:1979, mode:'min', bpm:117, prog:'i iv ♭VII ♭IIImaj7 ♭VImaj7 iiø Vsus4 V', b:4, note:'kompletter Quintfall in Moll'},
+  {n:'Every Breath You Take', a:'The Police', y:1983, mode:'maj', bpm:117, prog:'I vi IV V ♭VI ♭VII I I', b:8, note:'♭VI–♭VII–I: der epische Aufstieg'},
+  {n:'Sweet Dreams', a:'Eurythmics', y:1983, mode:'min', bpm:126, prog:'i ♭VI V i ♭VI V', b:[8,4,4,8,4,4], note:'dunkles Moll mit harter Dur-Dominante'},
+  {n:'Billie Jean', a:'Michael Jackson', y:1983, mode:'min', bpm:117, prog:'i ii ♭III ii', b:4, note:'dorische Farbe über liegendem Bass'},
+  {n:'Take On Me', a:'a-ha', y:1985, mode:'maj', bpm:84, prog:'ii V I IV', b:8, note:'beginnt auf der II. Stufe – schwebt'},
+  {n:'Careless Whisper (Stil)', a:'George Michael', y:1984, mode:'min', bpm:77, prog:'i7 iv7 ♭VImaj7 V7', b:8, note:'weiche Septakkorde, Dur-Dominante'},
+  {n:'Don’t Look Back in Anger', a:'Oasis', y:1996, mode:'maj', bpm:82, prog:'I V vi III IV V I V', b:4, note:'Dur-III statt Moll-iii – der Gänsehaut-Akkord'},
+  {n:'Mad World', a:'Gary Jules', y:2003, mode:'min', bpm:88, prog:'i ♭III ♭VII IV', b:8, note:'Dur-IV in Moll (dorisch)'},
+  {n:'Hey Ya!', a:'OutKast', y:2003, mode:'maj', bpm:80, prog:'I IV V VI', b:4, note:'Dur-VI statt Moll-vi'},
+  {n:'Get Lucky', a:'Daft Punk', y:2013, mode:'maj', bpm:116, prog:'vi I iii II', b:4, note:'Dur-II – kreist ohne aufzulösen'},
+  {n:'Blinding Lights', a:'The Weeknd', y:2020, mode:'min', bpm:86, prog:'i v ♭VII IV', b:8, note:'Moll-v und Dur-IV: Retro-Synth-Feeling'},
+];
+function hitSteps(h, key){
+  let k = {...key};
+  if (h.mode !== k.mode) k = h.mode === 'min' ? {root:(k.root + 9) % 12, mode:'min'} : {root:(k.root + 3) % 12, mode:'maj'};
+  // Hits behalten ihren eigenen Rhythmus (so, wie die Akkorde im Original wechseln)
+  const out = h.prog.split(/\s+/).map((t, i) => { const c = parseRoman(k, t); return {root:c.root, type:c.type, beats: Array.isArray(h.b) ? h.b[i] : h.b}; });
+  return {steps:out, key:k};
+}
 function generate(seconds, styleName, key, exactBeats){
   const st = STYLES[styleName]; st.name = styleName;
   let k = {...key};
@@ -969,7 +1001,9 @@ function generate(seconds, styleName, key, exactBeats){
   if (beats * st.phrase > want) beats = st.beats[0];
   const unit = beats * st.phrase;
   let totalBeats = Math.max(unit, Math.round(want / unit) * unit);
-  if (exactBeats){ totalBeats = exactBeats; while (beats > 2 && beats * 2 > exactBeats) beats /= 2; }
+  const fix = +els.genLen.value;   // feste Akkordlänge (1, 2 oder 4 Takte)
+  if (exactBeats){ totalBeats = exactBeats; while (!fix && beats > 2 && beats * 2 > exactBeats) beats /= 2; }
+  if (fix){ beats = fix; totalBeats = Math.min(64, Math.max(totalBeats, fix * 4)); }   // mind. 4 Akkorde
   const tonic = {...diatonic(k, 0), cat:'dia', deg:0};
   // A: meist eine stiltypische Folge (variiert), sonst frei durchs Netzwerk
   const idA = Math.random() < (st.idiom ?? 0.7) ? idiomPhrase(st, k, styleName) : null;
@@ -1935,6 +1969,73 @@ function laneAt(l, b, beats){
   if (prev && !prev.off && since < c.g) return prev.to + (c.to - prev.to) * ease(since / c.g);
   return c.to;
 }
+// ---------- Figuren auf den Linien (Lichtrenner, Boote, Rentiere) ----------
+var FIG = '';
+try { FIG = localStorage.getItem('chordwave.fig') || ''; } catch(e){}
+function drawRider(g, x, y, ang, col, s, j, isBass){
+  const t = performance.now() / 1000;
+  g.save(); g.translate(x, y);
+  if (FIG === 'cycle'){
+    g.rotate(ang);
+    const L = (isBass ? 34 : 28) * s, H = 4.2 * s;
+    g.translate(-L * 0.45, -H * 0.9);   // Hinterrad sitzt auf der Linie, Nase zeigt nach vorn
+    g.globalAlpha = 0.25; g.fillStyle = col; g.beginPath(); g.ellipse(-L * 0.1, 0, L * 0.8, H * 2.2, 0, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;   // Schein
+    g.fillStyle = '#0b0a12'; g.strokeStyle = col; g.lineWidth = 1.4 * s;
+    g.beginPath(); g.moveTo(-L * 0.66, H * 0.4); g.lineTo(-L * 0.58, -H * 0.55); g.quadraticCurveTo(-L * 0.1, -H * 1.25, L * 0.25, -H * 0.75); g.lineTo(L * 0.66, H * 0.15); g.lineTo(L * 0.55, H * 0.75); g.lineTo(-L * 0.55, H * 0.75); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = col; g.globalAlpha = 0.9; g.beginPath(); g.moveTo(-L * 0.32, -H * 0.85); g.quadraticCurveTo(-L * 0.12, -H * 1.9, L * 0.12, -H * 1.05); g.lineTo(L * 0.05, -H * 0.8); g.closePath(); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = col; g.lineWidth = 1 * s; g.beginPath(); g.moveTo(-L * 0.5, H * 0.1); g.lineTo(L * 0.5, H * 0.1); g.stroke();   // Leuchtstreifen   // Fahrer
+    for (const wx of [-L * 0.43, L * 0.42]){ g.beginPath(); g.arc(wx, H * 0.55, H * 0.95, 0, Math.PI * 2); g.fillStyle = '#0b0a12'; g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 1.6 * s; g.stroke(); }
+  } else if (FIG === 'boat'){
+    const bob = Math.sin(t * 2.2 + j * 1.3) * 1.6 * s;
+    g.translate(0, bob); g.rotate(ang * 0.5 + Math.sin(t * 1.7 + j) * 0.06);
+    const L = (isBass ? 26 : 21) * s;
+    g.strokeStyle = col; g.globalAlpha = 0.5; g.lineWidth = 1.2 * s;          // Bugwelle
+    g.beginPath(); g.moveTo(-L * 1.3, L * 0.12); g.quadraticCurveTo(-L * 0.9, -L * 0.05, -L * 0.55, L * 0.1); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = col; g.beginPath(); g.moveTo(-L * 0.55, -L * 0.05); g.lineTo(L * 0.6, -L * 0.05); g.lineTo(L * 0.38, L * 0.22); g.lineTo(-L * 0.4, L * 0.22); g.closePath(); g.fill();
+    g.strokeStyle = '#ffffff'; g.lineWidth = 1.2 * s; g.beginPath(); g.moveTo(0, -L * 0.05); g.lineTo(0, -L * 0.95); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.moveTo(L * 0.04, -L * 0.92); g.lineTo(L * 0.5, -L * 0.15); g.lineTo(L * 0.04, -L * 0.15); g.closePath(); g.fill();
+    g.globalAlpha = 0.7; g.beginPath(); g.moveTo(-L * 0.04, -L * 0.8); g.lineTo(-L * 0.38, -L * 0.15); g.lineTo(-L * 0.04, -L * 0.15); g.closePath(); g.fill(); g.globalAlpha = 1;
+  } else if (FIG === 'deer'){
+    g.rotate(ang * 0.6);
+    const S = (isBass ? 1.4 : 1.15) * s, ph = t * 9 + j * 0.9;
+    g.translate(0, -7 * S + Math.abs(Math.sin(ph)) * -2 * S);
+    if (isBass){   // Schlitten
+      g.fillStyle = '#d8323c'; g.beginPath(); g.moveTo(-14 * S, -6 * S); g.lineTo(8 * S, -6 * S); g.quadraticCurveTo(12 * S, -6 * S, 12 * S, -12 * S); g.lineTo(14 * S, -12 * S); g.lineTo(13 * S, 2 * S); g.lineTo(-12 * S, 2 * S); g.closePath(); g.fill();
+      g.strokeStyle = '#f5d76e'; g.lineWidth = 1.6 * S; g.beginPath(); g.moveTo(-16 * S, 6 * S); g.lineTo(13 * S, 6 * S); g.quadraticCurveTo(18 * S, 6 * S, 17 * S, 1 * S); g.stroke();
+      g.beginPath(); g.moveTo(-8 * S, 2 * S); g.lineTo(-8 * S, 6 * S); g.moveTo(6 * S, 2 * S); g.lineTo(6 * S, 6 * S); g.stroke();
+      g.fillStyle = '#8a5a2b'; g.beginPath(); g.arc(-4 * S, -9 * S, 5 * S, 0, Math.PI * 2); g.fill();   // Geschenkesack
+    } else {
+      const c = '#b07a47';
+      g.strokeStyle = c; g.lineWidth = 1.8 * S; g.lineCap = 'round';
+      const leg = (lx, o) => { const a = Math.sin(ph + o) * 0.6; g.beginPath(); g.moveTo(lx, 2 * S); g.lineTo(lx + Math.sin(a) * 6 * S, 2 * S + Math.cos(a) * 6 * S); g.stroke(); };
+      leg(-6 * S, 0); leg(-4 * S, Math.PI); leg(5 * S, Math.PI * 0.5); leg(7 * S, Math.PI * 1.5);
+      g.fillStyle = c; g.beginPath(); g.ellipse(0, 0, 9 * S, 4.2 * S, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.moveTo(6 * S, -2 * S); g.lineTo(9 * S, -8 * S); g.lineTo(11.5 * S, -7 * S); g.lineTo(9 * S, -1 * S); g.closePath(); g.fill();   // Hals
+      g.beginPath(); g.ellipse(12 * S, -8 * S, 3.6 * S, 2.3 * S, 0.3, 0, Math.PI * 2); g.fill();   // Kopf
+      g.strokeStyle = '#e8d5b0'; g.lineWidth = 1.2 * S;                                             // Geweih
+      g.beginPath(); g.moveTo(10.5 * S, -10 * S); g.lineTo(9 * S, -15 * S); g.moveTo(9.6 * S, -12.5 * S); g.lineTo(7 * S, -13.5 * S);
+      g.moveTo(12 * S, -10.3 * S); g.lineTo(13 * S, -15.5 * S); g.moveTo(12.6 * S, -13 * S); g.lineTo(15 * S, -14 * S); g.stroke();
+      const lead = j === P.voices - 1;   // die oberste Stimme führt – mit leuchtender roter Nase
+      g.fillStyle = lead ? '#ff3344' : '#2a1a10'; if (lead){ g.globalAlpha = 0.35; g.beginPath(); g.arc(15.5 * S, -7.4 * S, 4 * S, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }
+      g.beginPath(); g.arc(15.5 * S, -7.4 * S, 1.6 * S, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = col; g.globalAlpha = 0.8; g.lineWidth = 1.2 * S; g.beginPath(); g.ellipse(0, 0, 9.5 * S, 4.7 * S, 0, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+    }
+  }
+  g.restore();
+}
+// Schnee für die Weihnachtsversion
+const SNOW = Array.from({length: 45}, () => ({x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.6, v: Math.random() * 0.04 + 0.025, w: Math.random() * 6}));
+function drawSnow(g, X0, Y0, W, H, s){
+  if (FIG !== 'deer') return;
+  const t = performance.now() / 1000;
+  g.save(); g.fillStyle = '#ffffff';
+  for (const f of SNOW){
+    const y = (f.y + t * f.v) % 1, x = (f.x + Math.sin(t * 0.8 + f.w) * 0.01 + 1) % 1;
+    g.globalAlpha = 0.35 + f.r * 0.2; g.beginPath(); g.arc(X0 + x * W, Y0 + y * H, f.r * s, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+}
+function riderAngle(y1, y2, dx){ return Math.max(-0.7, Math.min(0.7, Math.atan2(y2 - y1, dx))); }
 // Zeichnet die Stimmen über die Zeit: links Vergangenes (leuchtend), rechts das Kommende (gedämpft)
 function drawTimeline(g, X0, Y0, W, H, opt = {}){
   const lv = ensureEvents(); if (!lv.events.length) return;
@@ -1982,16 +2083,23 @@ function drawTimeline(g, X0, Y0, W, H, opt = {}){
     if (j === n && !P.bass) continue;
     const m = laneAt(L.lanes[j], pos, beats); if (m == null) continue;
     const col = j === n ? BASS_COLOR : VOICE_COLORS[j], y = Y(m);
+    if (FIG){
+      const dx = W / span * 0.25, m0 = laneAt(L.lanes[j], pos - 0.25, beats);
+      drawRider(g, xp, y, riderAngle(m0 == null ? y : Y(m0), y, dx), col, s, j, j === n);
+      const nm = Math.round(m); labs.push({y, col, t:(ev ? toneName(ev.root, ev.type, nm) : noteDisp(nm)) + (Math.floor(nm / 12) - 1)});
+      continue;
+    }
     g.save();
     g.beginPath(); g.arc(xp, y, 9 * s, 0, Math.PI * 2); g.fillStyle = col; g.globalAlpha = 0.22; g.fill(); g.globalAlpha = 1;   // Schein ohne shadowBlur
     g.beginPath(); g.arc(xp, y, 4.5 * s, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
     g.lineWidth = 1.5 * s; g.strokeStyle = col; g.stroke(); g.restore();
     const nm = Math.round(m); labs.push({y, col, t:(ev ? toneName(ev.root, ev.type, nm) : noteDisp(nm)) + (Math.floor(nm / 12) - 1)});
   }
+  drawSnow(g, X0, Y0, W, H, s);
   if (opt.noteLabels !== false){
     labs.sort((a, b) => a.y - b.y); for (let i = 1; i < labs.length; i++) if (labs[i].y - labs[i - 1].y < 13 * s) labs[i].y = labs[i - 1].y + 13 * s;
     g.font = `600 ${Math.round(10.5 * s)}px system-ui`; g.textBaseline = 'middle';
-    labs.forEach(l => { g.fillStyle = l.col; g.globalAlpha = 0.9; g.fillText(l.t, xp + 10 * s, l.y); });
+    labs.forEach(l => { g.fillStyle = l.col; g.globalAlpha = 0.9; g.fillText(l.t, xp + (FIG ? 26 : 10) * s, l.y); });
     g.globalAlpha = 1;
   }
   g.restore();
@@ -2071,7 +2179,8 @@ function drawLines(){
     if (f && f.a > 0.01){
       const py = y(f.m[i]);
       g.globalAlpha = Math.min(1, f.a * 1.3 + 0.2);
-      g.beginPath(); g.arc(xNow, py, i === MAX_VOICES ? 3.5 : 5, 0, Math.PI * 2); g.fillStyle = col; g.fill();
+      if (FIG){ const fb = hist[Math.max(0, hist.length - 9)]; drawRider(g, xNow, py, riderAngle(y(fb.m[i]), py, xNow - x(fb.t) || 1), col, 1, i, i === MAX_VOICES); }
+      else { g.beginPath(); g.arc(xNow, py, i === MAX_VOICES ? 3.5 : 5, 0, Math.PI * 2); g.fillStyle = col; g.fill(); }
       const nm = Math.round(f.m[i]);
       labels.push({y:py, col, text:(curRoot != null ? toneName(curRoot, curType, nm) : noteDisp(nm)) + (Math.floor(nm / 12) - 1)});
     }
@@ -2168,7 +2277,7 @@ function pianoHit(e){
 
 /* ---------- UI aufbauen ---------- */
 const els = {};
-['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','genKit','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
+['chordName','keyLabel','keySel','sugs','genDur','genStyle','genLen','genHit','figSel','vFig','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','genKit','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
  'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs','audioStat'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
@@ -2509,9 +2618,11 @@ function applyStyleKit(name){
   syncUI(); changed('preset');
 }
 function runGenerator(seconds, exactBeats){
-  if (els.genKit.checked) applyStyleKit(els.genStyle.value);
+  const hit = els.genHit.value !== '' ? HITS[+els.genHit.value] : null;
+  if (els.genKit.checked && !hit) applyStyleKit(els.genStyle.value);
+  if (hit && els.genKit.checked){ P.bpm = hit.bpm; els.bpm.value = P.bpm; changed('bpm'); }
   const key = els.genKey.value === 'rnd' ? KEYS[Math.floor(Math.random() * 12) + (Math.random() < 0.5 ? 0 : 12)] : currentKey();
-  const g = generate(seconds, els.genStyle.value, key, exactBeats);
+  const g = hit ? hitSteps(hit, key) : generate(seconds, els.genStyle.value, key, exactBeats);
   pushUndo(); loopSeed = Math.floor(Math.random() * 1e6);
   if (looping) stopLoop();
   if (engine) engine.gateOff(ctx.currentTime + 0.005);
@@ -2519,10 +2630,15 @@ function runGenerator(seconds, exactBeats){
   chordHist = []; leader.prev = null;
   if (els.keySel.value !== 'auto'){ keyFixed = g.key; els.keySel.value = KEYS.findIndex(k => k.root === g.key.root && k.mode === g.key.mode); }
   const secs = Math.round(steps.reduce((a, x) => a + x.beats, 0) * 60 / P.bpm);
-  toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
+  if (hit) toast(`„${hit.n}“ (${hit.a}, ${hit.y}) in ${keyName(g.key)} – ${tr(hit.note)}`);
+  else toast(`${steps.length} Akkorde in ${keyName(g.key)}, ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} min`);
   setTimeout(startLoop, 120);
 }
 els.genBtn.addEventListener('click', () => els.genDur.value === 'bars' ? runGenerator(0, barCount() * 4) : runGenerator(+els.genDur.value));
+HITS.forEach((h, i) => { const o = document.createElement('option'); o.value = i; o.textContent = `🎵 ${h.n} – ${h.a} (${h.y})`; els.genHit.append(o); });
+try { const v = localStorage.getItem('chordwave.genlen'); if (v) els.genLen.value = v; } catch(e){}
+els.genLen.addEventListener('change', () => { try { localStorage.setItem('chordwave.genlen', els.genLen.value); } catch(e){} });
+els.genHit.addEventListener('change', () => { els.genStyle.disabled = els.genHit.value !== ''; });
 try { els.genKit.checked = localStorage.getItem('chordwave.kit') !== '0'; } catch(e){ els.genKit.checked = true; }
 els.genKit.addEventListener('change', () => { try { localStorage.setItem('chordwave.kit', els.genKit.checked ? '1' : '0'); } catch(e){} });
 els.undoBtn.addEventListener('click', undo);
@@ -3243,6 +3359,10 @@ els.vRec.addEventListener('click', () => vRecorder ? stopVideoRec() : startVideo
 els.vShare.addEventListener('click', () => { if (lastVideo) shareFile(lastVideo.blob, lastVideo.name).catch(e => toast('Fehler: ' + (e && e.message || e))); });
 els.vSave.addEventListener('click', () => { if (lastVideo) saveFile(lastVideo.blob, lastVideo.name).catch(e => toast('Fehler: ' + (e && e.message || e))); });
 els.vDoneClose.addEventListener('click', () => els.vDone.classList.remove('on'));
+const setFig = v => { FIG = v; try { localStorage.setItem('chordwave.fig', v); } catch(e){} els.figSel.value = v; els.vFig.value = v; };
+els.figSel.value = FIG; els.vFig.value = FIG;
+els.figSel.addEventListener('change', () => setFig(els.figSel.value));
+els.vFig.addEventListener('change', () => setFig(els.vFig.value));
 const setTheme = v => { P.theme = v; applyTheme(); save(); els.themeSel.value = v; els.vTheme.value = v; };
 els.vTheme.addEventListener('change', () => setTheme(els.vTheme.value));
 els.themeSel.value = P.theme || 'Neon';
@@ -3293,7 +3413,8 @@ const EN = {
   '+ Pause anhängen':'+ Add rest','Loop leeren':'Clear loop','↺ Zurücksetzen':'↺ Reset','Muster':'Pattern','Lautstärke':'Volume','kein Beat':'no beat',
   'Tempo des Beats übernehmen':'Use the beat’s tempo','Der Beat läuft mit, wenn der Loop spielt, und ist im WAV- und MIDI-Export enthalten.':'The beat plays along with the loop and is included in WAV and MIDI export.',
   'Generator':'Generator','Dauer':'Length','Stil':'Style','aktuelle':'current','zufällig':'random','Sound, Beat und Tempo passend zum Stil':'Sound, beat and tempo to match the style',
-  '✨ Abfolge erzeugen':'✨ Generate progression','↶ Rückgängig':'↶ Undo','✨ Erzeugen':'✨ Generate',
+  '✨ Abfolge erzeugen':'✨ Generate progression','Akkordlänge':'Chord length','je nach Stil':'by style','4 Takte':'4 bars','Quelle':'Source','zufällig nach Stil':'random by style','Figuren':'Figures','keine':'none','Lichtrenner':'Light racers','Boote':'Boats','Rentiere 🎄':'Reindeer 🎄',
+  'Moll mit Dur-Dominante und Abstieg über alle Stufen':'minor with major dominant, descending through every degree','Zwischendominante III7 führt in die Parallele':'secondary dominant III7 leads to the relative minor','absteigende Linie im Akkord + Doppeldominante':'descending inner line + double dominant','geliehenes ♭VII – der berühmte Na-na-na-Teil':'borrowed ♭VII – the famous na-na-na part','kompletter Quintfall in Moll':'full circle of fifths in minor','♭VI–♭VII–I: der epische Aufstieg':'♭VI–♭VII–I: the epic rise','dunkles Moll mit harter Dur-Dominante':'dark minor with a hard major dominant','dorische Farbe über liegendem Bass':'Dorian color over a pedal bass','beginnt auf der II. Stufe – schwebt':'starts on the ii – floats','weiche Septakkorde, Dur-Dominante':'soft seventh chords, major dominant','Dur-III statt Moll-iii – der Gänsehaut-Akkord':'major III instead of minor iii – the goosebumps chord','Dur-IV in Moll (dorisch)':'major IV in minor (Dorian)','Dur-VI statt Moll-vi':'major VI instead of minor vi','Dur-II – kreist ohne aufzulösen':'major II – circles without resolving','Moll-v und Dur-IV: Retro-Synth-Feeling':'minor v and major IV: retro synth feel','↶ Rückgängig':'↶ Undo','✨ Erzeugen':'✨ Generate',
   'Ersetzt den Loop durch eine neue Abfolge in der Länge, die du wählst (beim eingestellten Tempo), und spielt sie ab.':'Replaces the loop with a new progression of the chosen length (at the current tempo) and plays it.',
   'Export':'Export','Durchläufe':'Passes','⬇ WAV':'⬇ WAV','⬇ MIDI':'⬇ MIDI',
   '● drücken und im Tab „Akkorde“ spielen – jeder Akkord wird angehängt. Tippe oben auf einen Akkord im Loop, um ihn zu bearbeiten.':'Press ● and play in the “Chords” tab – every chord is added. Tap a chord in the loop at the top to edit it.',
