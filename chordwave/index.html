@@ -358,7 +358,7 @@ body.focus #focus{display:block}
       </div>
       <div class="row">
         <label>Audio <select id="latency">
-          <option value="playback">stabil (empfohlen)</option><option value="balanced">ausgewogen</option><option value="interactive">schnell (kann knistern)</option></select></label>
+          <option value="0.3">maximal stabil (Bluetooth)</option><option value="playback">stabil (empfohlen)</option><option value="balanced">ausgewogen</option><option value="interactive">schnell (kann knistern)</option></select></label>
       </div>
       <div class="row">
         <label><input type="checkbox" id="bass"> Bass</label>
@@ -1096,7 +1096,15 @@ class Engine{
     this.delay.delayTime.setTargetAtTime(Math.min(2, p.delBeats * 60 / p.bpm), t, 0.05);
     this.fb.gain.setTargetAtTime(p.delFb, t, 0.02);
     this.delWet.gain.setTargetAtTime(p.delMix, t, 0.02);
-    this.master.gain.setTargetAtTime(p.volume * 0.8, t, 0.02);
+    if (!this.recFade) this.master.gain.setTargetAtTime(p.volume * 0.8, t, 0.02);
+    // Was nicht gebraucht wird, abkoppeln – abgekoppelte Knoten rechnet der Browser nicht mit (weniger Last, weniger Knistern)
+    this._conn = this._conn || {verb:true, delay:true, chorus:true};
+    const link = (key, from, to, on) => { if (!!this._conn[key] === on) return; try { on ? from.connect(to) : from.disconnect(to); } catch(e){} this._conn[key] = on; };
+    link('verb', this.pump, this.verb, p.verbMix > 0.001);
+    link('delay', this.pump, this.delay, p.delMix > 0.001);
+    link('chorus', this.pump, this.chIn, (p.chorus || 0) > 0.001);
+    this.voices.forEach((v, i) => { const isB = i === MAX_VOICES; if (this._conn['v' + i] === undefined) this._conn['v' + i] = true;
+      link('v' + i, v.pan, this.bus, isB ? !!p.bass : i < p.voices); });
     this.drumBus.gain.setTargetAtTime((p.beatVol ?? 0.7) * 0.9, t, 0.02);
     if (!(p.pump > 0)) this.pump.gain.setTargetAtTime(1, t, 0.02);
     if (!p.arp || p.arp === 'off') this.voices.forEach(v => v.ag.gain.setTargetAtTime(1, t, 0.01));
@@ -1332,7 +1340,8 @@ function resetAudio(){
 function ensureAudio(){
   if (!ctx){
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
-    ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint: P.latency || 'playback'});
+    const lh = P.latency && !isNaN(+P.latency) ? +P.latency : (P.latency || 'playback');
+    ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint: lh});
     engine = new Engine(ctx, P);
   }
   if (ctx.state !== 'running') ctx.resume();
@@ -1935,7 +1944,8 @@ function drawTimeline(g, X0, Y0, W, H, opt = {}){
     if (j === n && !P.bass) continue;
     const m = laneAt(L.lanes[j], pos, beats); if (m == null) continue;
     const col = j === n ? BASS_COLOR : VOICE_COLORS[j], y = Y(m);
-    g.save(); g.shadowColor = col; g.shadowBlur = fxMode() ? 0 : 10 * s;
+    g.save();
+    g.beginPath(); g.arc(xp, y, 9 * s, 0, Math.PI * 2); g.fillStyle = col; g.globalAlpha = 0.22; g.fill(); g.globalAlpha = 1;   // Schein ohne shadowBlur
     g.beginPath(); g.arc(xp, y, 4.5 * s, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
     g.lineWidth = 1.5 * s; g.strokeStyle = col; g.stroke(); g.restore();
     const nm = Math.round(m); labs.push({y, col, t:(ev ? toneName(ev.root, ev.type, nm) : noteDisp(nm)) + (Math.floor(nm / 12) - 1)});
@@ -3086,9 +3096,9 @@ function drawVideo(){
     g.font = `700 ${46 * s}px system-ui`; const rw = g.measureText(r).width;
     g.font = `500 ${24 * s}px system-ui`; const qw = g.measureText(q).width;
     const x0 = W / 2 - (rw + qw + 3 * s) / 2;
-    g.textAlign = 'left'; g.fillStyle = '#ffffff'; g.shadowColor = 'rgba(255,255,255,.35)'; g.shadowBlur = 16 * s;
+    g.textAlign = 'left'; g.fillStyle = '#ffffff';
     g.font = `700 ${46 * s}px system-ui`; g.fillText(r, x0, 88 * s);
-    g.font = `500 ${24 * s}px system-ui`; g.fillText(q, x0 + rw + 3 * s, 88 * s); g.shadowBlur = 0;
+    g.font = `500 ${24 * s}px system-ui`; g.fillText(q, x0 + rw + 3 * s, 88 * s);
   }
   g.textAlign = 'center'; g.fillStyle = 'rgba(236,233,247,.45)'; g.font = `500 ${10 * s}px system-ui`; g.fillText('driftingchords.app', W / 2, 106 * s);
   // Zeitachse
@@ -3099,11 +3109,25 @@ function drawVideo(){
   g.fillStyle = 'rgba(236,233,247,.55)'; g.font = `500 ${10 * s}px system-ui`; g.fillText(tr('Erstellt mit'), 80 * s, 558 * s);
   g.fillStyle = '#ffffff'; g.font = `700 ${16 * s}px system-ui`; g.fillText('Drifting Chords', 80 * s, 577 * s);
   g.fillStyle = 'rgba(236,233,247,.55)'; g.font = `500 ${10 * s}px system-ui`; g.fillText('Harmony in endless motion.', 80 * s, 592 * s);
+  // Ein-/Ausblenden während der Aufnahme
+  if (vRecorder){
+    const now = performance.now(), fin = Math.max(0, 1 - (now - vRecorder.t0) / 900), fout = Math.max(0, Math.min(1, (now - (vRecorder.tEnd - 2200)) / 1800));
+    if (fin > 0){ g.fillStyle = `rgba(0,0,0,${fin})`; g.fillRect(0, 0, W, H); }
+    if (fout > 0){
+      g.fillStyle = `rgba(0,0,0,${fout * 0.82})`; g.fillRect(0, 0, W, H);
+      g.globalAlpha = fout; g.textAlign = 'center';
+      drawWaves(g, W / 2 - 50 * s, 290 * s, 100 * s, VOICE_COLORS[Math.max(0, P.voices - 1)]);
+      g.fillStyle = '#ffffff'; g.font = `700 ${26 * s}px system-ui`; g.fillText('Drifting Chords', W / 2, 360 * s);
+      g.fillStyle = 'rgba(236,233,247,.7)'; g.font = `500 ${12 * s}px system-ui`; g.fillText('Harmony in endless motion.', W / 2, 382 * s);
+      g.fillText('driftingchords.app', W / 2, 402 * s);
+      g.globalAlpha = 1; g.textAlign = 'left';
+    }
+  }
 }
 function setVideo(on){
   videoOn = on; els.video.classList.toggle('on', on);
   els.vTheme.value = P.theme || 'Neon';
-  if (!on && vRecorder) stopVideoRec();
+  if (!on && vRecorder) stopVideoRec(true);
 }
 function startVideoRec(){
   if (!window.MediaRecorder || !els.vCanvas.captureStream){ toast('Dieser Browser kann keine Videos aufnehmen.'); return; }
@@ -3139,14 +3163,29 @@ function startVideoRec(){
   };
   if (looping) stopLoop();
   mr.start(1000); startLoop();
-  vRecorder = {mr, timer: setTimeout(stopVideoRec, ms)};
+  // Ton weich einblenden und am Ende weich ausblenden
+  const mg = engine.master.gain, vol = P.volume * 0.8, t = ctx.currentTime, total = ms / 1000;
+  engine.recFade = true;
+  ramp(mg, t); mg.setValueAtTime(0.0001, t); mg.linearRampToValueAtTime(vol, t + 1.0);
+  mg.setValueAtTime(vol, t + Math.max(1.2, total - 2.2)); mg.linearRampToValueAtTime(0.0001, t + Math.max(1.4, total - 0.2));
+  const now = performance.now();
+  vRecorder = {mr, t0: now, tEnd: now + ms, timer: setTimeout(() => stopVideoRec(true), ms + 200)};
   els.vRec.classList.add('on'); els.vRec.textContent = '■ Stopp';
 }
-function stopVideoRec(){
+function stopVideoRec(immediate){
   if (!vRecorder) return;
+  if (!immediate && !vRecorder.fading){                 // von Hand gestoppt: erst weich ausblenden
+    vRecorder.fading = true; clearTimeout(vRecorder.timer);
+    const mg = engine.master.gain, t = ctx.currentTime;
+    ramp(mg, t); mg.linearRampToValueAtTime(0.0001, t + 1.6);
+    vRecorder.tEnd = performance.now() + 2000;
+    vRecorder.timer = setTimeout(() => stopVideoRec(true), 1900);
+    return;
+  }
   clearTimeout(vRecorder.timer); vRecorder.mr.stop(); vRecorder = null;
   els.vRec.classList.remove('on'); els.vRec.textContent = '⏺ Video';
   if (looping) stopLoop();
+  if (engine){ engine.recFade = false; const mg = engine.master.gain; ramp(mg, ctx.currentTime); mg.setTargetAtTime(P.volume * 0.8, ctx.currentTime + 0.3, 0.1); }
 }
 els.videoBtn.addEventListener('click', () => setVideo(true));
 els.fVideo.addEventListener('click', () => setVideo(true));
@@ -3250,7 +3289,7 @@ const EN = {
   'In Safari: Teilen-Symbol ↑ antippen und dann „Zum Home-Bildschirm“.':'In Safari: tap the share icon ↑ and then “Add to Home Screen”.',
   'leitereigen':'diatonic','Zwischendominante':'secondary dominant','geliehen (Modal Interchange)':'borrowed (modal interchange)','Tritonus-Substitution':'tritone substitution','chromatische Mediante':'chromatic mediant',
   'Datei wird geteilt …':'Sharing file …',
-  'Leeren':'Clear','Takt':'Bar','Video fertig':'Video ready','📤 Teilen':'📤 Share','Schließen':'Close','eigene …':'custom …','1× Loop':'1× loop','2× Loop':'2× loop','4× Loop':'4× loop','6× Loop':'6× loop','8× Loop':'8× loop',
+  'Leeren':'Clear','Takt':'Bar','maximal stabil (Bluetooth)':'maximum stability (Bluetooth)','Video fertig':'Video ready','📤 Teilen':'📤 Share','Schließen':'Close','eigene …':'custom …','1× Loop':'1× loop','2× Loop':'2× loop','4× Loop':'4× loop','6× Loop':'6× loop','8× Loop':'8× loop',
   'Gespeichert in Dokumente/Drifting Chords.':'Saved to Documents/Drifting Chords.','Wie viele Loop-Durchläufe (oder Sekunden mit „s“, z. B. 45s)?':'How many loop passes (or seconds with “s”, e.g. 45s)?','Farben':'Colors','Eis':'Ice','Glut':'Ember','Lila':'Purple','TONART':'KEY','Erstellt mit':'Made with','Video gespeichert.':'Video saved.',
   'Video-Modus':'Video mode','Video aufnehmen':'Record video','Länge der Aufnahme':'Recording length','Dieser Browser kann keine Videos aufnehmen.':'This browser cannot record video.','Klang':'Sound','Ton':'Key','— eigener —':'— custom —','Raum':'Space','Stereo-Breite':'Stereo width','Chorus':'Chorus',
   'Instrument wechseln (Effekte und Loop bleiben)':'Change instrument (effects and loop stay)','Alles einen Halbton tiefer':'Everything one semitone down','Alles einen Halbton höher':'Everything one semitone up','Instrument':'Instrument',
