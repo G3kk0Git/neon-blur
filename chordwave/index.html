@@ -362,6 +362,7 @@ body.focus #focus{display:block}
       <div class="row">
         <label>Audio <select id="latency">
           <option value="0.3">maximal stabil (Bluetooth)</option><option value="playback">stabil (empfohlen)</option><option value="balanced">ausgewogen</option><option value="interactive">schnell (kann knistern)</option></select></label>
+        <span class="hint" id="audioStat"></span>
       </div>
       <div class="row">
         <label><input type="checkbox" id="bass"> Bass</label>
@@ -1017,14 +1018,24 @@ const STYLE_KIT = {
 
 /* ---------- Klangerzeugung ---------- */
 const MAX_VOICES = 6;
+// linear bis 0,6, darüber sanft gerundet bis höchstens 0,98
+function softClipCurve(){
+  const n = 2048, c = new Float32Array(n), k = 0.6;
+  for (let i = 0; i < n; i++){
+    const x = i / (n - 1) * 2 - 1, a = Math.abs(x);
+    c[i] = Math.sign(x) * (a <= k ? a : k + (0.98 - k) * Math.tanh((a - k) / (0.98 - k)));
+  }
+  return c;
+}
 function makeImpulse(ctx, seconds){
-  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  // Das letzte Viertel des Halls ist leiser als -40 dB → weglassen (spart Rechenzeit, klingt gleich)
+  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds * 0.78));
   const buf = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let c = 0; c < 2; c++){
     const d = buf.getChannelData(c);
     let lp = 0;
     for (let i = 0; i < len; i++){
-      const t = i / len;
+      const t = i / len * 0.78;
       lp += 0.35 * ((Math.random() * 2 - 1) - lp);
       d[i] = lp * Math.pow(1 - t, 3.2) * (i < 64 ? i / 64 : 1);
     }
@@ -1044,7 +1055,11 @@ class Engine{
     const out = ctx.createDynamicsCompressor();
     out.threshold.value = -9; out.knee.value = 6; out.ratio.value = 12; out.attack.value = 0.003; out.release.value = 0.25;
     this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 4096; this.analyser.smoothingTimeConstant = 0;
-    out.connect(this.analyser); this.analyser.connect(ctx.destination);
+    // Der Kompressor ist für schnelle Anschläge (Pluck, Arp) zu langsam und hebt automatisch an → Spitzen über 0 dB knistern.
+    // Darum dahinter: etwas leiser + weicher Begrenzer, der nie über 0 dB lässt.
+    this.trim = ctx.createGain(); this.trim.gain.value = 0.8;
+    this.clip = ctx.createWaveShaper(); this.clip.curve = softClipCurve(); this.clip.oversample = 'none';
+    out.connect(this.trim); this.trim.connect(this.clip); this.clip.connect(this.analyser); this.analyser.connect(ctx.destination);
     this.master = ctx.createGain(); this.master.connect(out);
     this.amp = ctx.createGain(); this.amp.gain.value = 0;
     this.filter = ctx.createBiquadFilter(); this.filter.type = 'lowpass';
@@ -1107,7 +1122,9 @@ class Engine{
     link('delay', this.pump, this.delay, p.delMix > 0.001);
     link('chorus', this.pump, this.chIn, (p.chorus || 0) > 0.001);
     this.voices.forEach((v, i) => { const isB = i === MAX_VOICES; if (this._conn['v' + i] === undefined) this._conn['v' + i] = true;
-      link('v' + i, v.pan, this.bus, isB ? !!p.bass : i < p.voices); });
+      link('v' + i, v.pan, this.bus, isB ? !!p.bass : i < p.voices);
+      if (this._conn['b' + i] === undefined) this._conn['b' + i] = true;
+      link('b' + i, v.b, v.gb, (p.mix2 ?? 1) > 0.001); });
     this.drumBus.gain.setTargetAtTime((p.beatVol ?? 0.7) * 0.9, t, 0.02);
     if (!(p.pump > 0)) this.pump.gain.setTargetAtTime(1, t, 0.02);
     if (!p.arp || p.arp === 'off') this.voices.forEach(v => v.ag.gain.setTargetAtTime(1, t, 0.01));
@@ -1337,6 +1354,7 @@ let ctx = null, engine = null;
 const leader = new VoiceLeader();
 function resetAudio(){
   if (looping) stopLoop();
+  underBase = null;
   if (ctx){ try { ctx.close(); } catch(e){} }
   ctx = null; engine = null; sounding = false; hist.length = 0; marks.length = 0;
 }
@@ -1349,6 +1367,23 @@ function ensureAudio(){
   }
   if (ctx.state !== 'running') ctx.resume();
 }
+
+// Aussetzer-Wächter: zählt, wie oft das Gerät mit dem Ton nicht nachkommt (Chrome „playbackStats“)
+let underBase = null, underCount = 0, underWarned = false, underHist = [];
+setInterval(() => {
+  if (!ctx || ctx.state !== 'running' || !ctx.playbackStats) return;
+  const n = ctx.playbackStats.underrunEvents || 0;
+  if (underBase === null || n < underBase){ underBase = n; return; }
+  const d = n - underBase; underBase = n;
+  if (els.audioStat) els.audioStat.textContent = tr('Aussetzer: ') + underCount;
+  if (!d) return;
+  underCount += d; const now = performance.now(); underHist.push(now); underHist = underHist.filter(x => now - x < 15000);
+  if (els.audioStat) els.audioStat.textContent = tr('Aussetzer: ') + underCount;
+  if (!underWarned && underHist.length >= 2){
+    underWarned = true; lowFx = true;
+    toast(tr(P.latency === '0.3' ? 'Ton-Aussetzer erkannt – Anzeige auf sparsam gestellt.' : 'Ton-Aussetzer erkannt – stell unter Klang → Audio „maximal stabil“ ein.'));
+  }
+}, 1000);
 
 /* ---------- Spielen ---------- */
 let curRoot = null, curType = 0, sounding = false;
@@ -2134,7 +2169,7 @@ function pianoHit(e){
 /* ---------- UI aufbauen ---------- */
 const els = {};
 ['chordName','keyLabel','keySel','sugs','genDur','genStyle','genKey','genBtn','undoBtn','scope','piano','octDown','octUp','octVal','quickGlide','quickGlideVal','genKit','latency','arp','arpRate','beatSel','beatVol','beatTempo','loopBars','focusBtn','stepEdit','roots','types','steps','bpm','stepBeats','passes','recBtn','playBtn','pauseStepBtn','clearBtn','wavBtn','midiBtn',
- 'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs'].forEach(id => els[id] = document.getElementById(id));
+ 'latchBtn','stopBtn','preset','presetSaveBtn','presetDelBtn','soundResetBtn','loopResetBtn','wave','bass','retrig','knobs','audioStat'].forEach(id => els[id] = document.getElementById(id));
 let toastTimer = 0;
 function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
 
@@ -3294,7 +3329,7 @@ const EN = {
   'Erst ein Beat-Muster wählen.':'Choose a beat pattern first.','Erst einen Akkord in einen Takt setzen.':'Put a chord into a bar first.',
   'Loop geleert (Rückgängig möglich).':'Loop cleared (undo possible).','Loop zurückgesetzt.':'Loop reset.','Sound zurückgesetzt.':'Sound reset.',
   'MIDI gespeichert.':'MIDI saved.','WAV gespeichert.':'WAV saved.','WAV wird berechnet …':'Rendering WAV …','Zu lang für den Export (max. 10 Minuten).':'Too long to export (max. 10 minutes).',
-  'Speichern nicht möglich (privater Modus?)':'Saving not possible (private mode?)','Audio neu eingestellt – tippe einen Akkord.':'Audio reset – tap a chord.',
+  'Speichern nicht möglich (privater Modus?)':'Saving not possible (private mode?)','Audio neu eingestellt – tippe einen Akkord.':'Audio reset – tap a chord.','Aussetzer: ':'Dropouts: ','Ton-Aussetzer erkannt – Anzeige auf sparsam gestellt.':'Audio dropouts detected – display set to light mode.','Ton-Aussetzer erkannt – stell unter Klang → Audio „maximal stabil“ ein.':'Audio dropouts detected – set Sound → Audio to “maximum stability”.',
   'Alle Sound-Regler auf Standard zurücksetzen?':'Reset all sound controls to default?','Loop leeren und Tempo, Akkordlänge, Export und Generator auf Standard setzen?':'Clear the loop and reset tempo, chord length, export and generator?',
   'Loop wirklich leeren?':'Really clear the loop?','Name für deinen Sound:':'Name for your sound:','Name für diesen Loop:':'Name for this loop:','Mein Sound':'My sound',
   'Drifting Chords ist installiert.':'Drifting Chords is installed.',
