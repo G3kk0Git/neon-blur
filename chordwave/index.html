@@ -3306,6 +3306,15 @@ var videoOn = false, vRecorder = null, lastVideo = null;
 ['video','vCanvas','vPlay','vRec','vPasses','vTheme','vClose','videoBtn','fVideo','themeSel','vDone','vDoneInfo','vShare','vSave','vDoneClose'].forEach(id => els[id] = document.getElementById(id));
 // ---------- Intro: fünf Logo-Wellen zeichnen sich, leuchten auf, dann erscheint der Name ----------
 const INTRO_SEC = 3.0;
+// Form der Logo-Welle (aus dem App-Icon abgetastet) und seine Violett-Töne, oben hell → unten dunkler
+const LOGO_PTS = [218,208,201,200,204,211,219,228,238,248,255,256,250,239,226,213,198,182,169,162,163,173,192,219];
+const LOGO_COLS = ['#bdb5ff', '#aaa1f4', '#978de6', '#857ad6', '#7467c4'];
+function logoWave(u){   // 0..1 → Höhe in Icon-Pixeln relativ zur Mitte (Bereich etwa ±47)
+  const f = Math.max(0, Math.min(1, u)) * (LOGO_PTS.length - 1), i = Math.min(LOGO_PTS.length - 2, Math.floor(f)), r = f - i;
+  const P = k => LOGO_PTS[Math.max(0, Math.min(LOGO_PTS.length - 1, k))];
+  const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);   // Catmull-Rom: weiche Kurve ohne Knicke
+  return 0.5 * (2 * p1 + (-p0 + p2) * r + (2 * p0 - 5 * p1 + 4 * p2 - p3) * r * r + (-p0 + 3 * p1 - 3 * p2 + p3) * r * r * r) - 209;
+}
 function drawIntro(g, W, H, t){
   const s = Math.min(W, H * 0.62) / 360, cx = W / 2, cy = H / 2 - 30 * s;
   const cl = x => x < 0 ? 0 : x > 1 ? 1 : x;
@@ -3322,17 +3331,17 @@ function drawIntro(g, W, H, t){
   // Wellen: erst eine kleinere, dann eine höhere Anhebung (wie das Logo)
   const ww = 230 * s, x0 = cx - ww / 2, N = 90;
   // Erst fünf einzelne Stimmen, die wie bei einem Akkordwechsel gleiten – dann verschmelzen sie zum Logo
-  const logo = (u, i) => cy + (i - 2) * 10 * s - 48 * s * (1 - i * 0.07) * (0.45 * Math.exp(-(((u - 0.32) / 0.11) ** 2)) + Math.exp(-(((u - 0.66) / 0.12) ** 2)));
+  const logo = (u, i) => cy + (i - 2) * 11 * s + logoWave(u) * 0.62 * s;
   const voice = (u, i) => cy + (i - 2) * 30 * s + [-22, 14, -10, 18, -14][i] * s * ease(cl((u - 0.45) / 0.18));
   const mix = ease(cl((t - 0.85) / 0.9));
   const shape = (u, i) => voice(u, i) + (logo(u, i) - voice(u, i)) * mix;
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (let i = 0; i < 5; i++){
     const pr = ease(cl((t - 0.1 - i * 0.12) / 1.0)); if (pr <= 0) continue;
-    const col = VOICE_COLORS[i % VOICE_COLORS.length], n = Math.max(1, Math.round(N * pr));
+    const col = LOGO_COLS[i], n = Math.max(1, Math.round(N * pr));
     g.beginPath();
     for (let k = 0; k <= n; k++){ const u = k / N; k ? g.lineTo(x0 + u * ww, shape(u, i)) : g.moveTo(x0 + u * ww, shape(u, i)); }
-    g.strokeStyle = col; g.globalAlpha = 0.18 + 0.2 * glow; g.lineWidth = 10 * s; g.stroke();
+    g.strokeStyle = '#9d90ff'; g.globalAlpha = 0.14 + 0.2 * glow; g.lineWidth = 10 * s; g.stroke(); g.strokeStyle = col;
     g.globalAlpha = 1; g.lineWidth = 3 * s; g.stroke();
     if (pr < 1){ const u = n / N; g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x0 + u * ww, shape(u, i), 3.4 * s, 0, Math.PI * 2); g.fill(); }
   }
@@ -3346,10 +3355,10 @@ function drawIntro(g, W, H, t){
     g.font = `700 ${30 * s}px system-ui, sans-serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
     const ws = [...txt].map(ch => g.measureText(ch).width), tw = ws.reduce((a, b) => a + b, 0) + sp * (txt.length - 1);
     let x = cx - tw / 2; g.globalAlpha = tp; g.fillStyle = '#ffffff';
-    [...txt].forEach((ch, i) => { g.fillText(ch, x, cy + 70 * s); x += ws[i] + sp; });
+    [...txt].forEach((ch, i) => { g.fillText(ch, x, cy + 88 * s); x += ws[i] + sp; });
   }
   const sl = cl((t - 1.8) / 0.6);
-  if (sl > 0){ g.globalAlpha = sl * 0.75; g.fillStyle = '#ece9f7'; g.textAlign = 'center'; g.font = `500 ${13 * s}px system-ui, sans-serif`; g.fillText('Harmony in endless motion.', cx, cy + 100 * s); }
+  if (sl > 0){ g.globalAlpha = sl * 0.75; g.fillStyle = '#ece9f7'; g.textAlign = 'center'; g.font = `500 ${13 * s}px system-ui, sans-serif`; g.fillText('Harmony in endless motion.', cx, cy + 116 * s); }
   g.restore();
 }
 // Markenklang: ein Akkord, dessen Töne von unten in den ersten Akkord des Loops gleiten
@@ -3372,12 +3381,14 @@ function brandSound(t, root, minor){
     });
   });
 }
-function drawWaves(g, x, y, w, col){            // kleines Logo
-  g.save(); g.lineCap = 'round';
-  for (let i = 0; i < 4; i++){ g.beginPath();
-    for (let k = 0; k <= 40; k++){ const t = k / 40, yy = y + i * w * 0.07 - w * 0.12 * Math.cos(2 * Math.PI * (t - 0.18) / 0.66) * (t > 0.55 ? 1.2 : 0.6);
-      k ? g.lineTo(x + t * w, yy) : g.moveTo(x + t * w, yy); }
-    g.strokeStyle = col; g.globalAlpha = 1 - i * 0.2; g.lineWidth = w * 0.035; g.stroke(); }
+function drawWaves(g, x, y, w){                  // kleines Logo (wie das App-Icon)
+  g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+  const k = w / 345;
+  for (let i = 0; i < 5; i++){ g.beginPath();
+    for (let j = 0; j <= 48; j++){ const u = j / 48, yy = y + (i - 2) * 21 * k * 0.6 + logoWave(u) * k;
+      j ? g.lineTo(x + u * w, yy) : g.moveTo(x + u * w, yy); }
+    g.strokeStyle = '#9d90ff'; g.globalAlpha = 0.25; g.lineWidth = w * 0.06; g.stroke();
+    g.strokeStyle = LOGO_COLS[i]; g.globalAlpha = 1; g.lineWidth = w * 0.022; g.stroke(); }
   g.restore();
 }
 function drawVideo(){
