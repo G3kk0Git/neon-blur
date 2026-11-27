@@ -193,6 +193,9 @@ body.focus #focus{display:block}
 .vbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .vbar button,.vbar select{height:40px}
 #vRec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
+#introCv{position:fixed;inset:0;width:100%;height:100%;z-index:50;background:#0b0a12;animation:introHide .4s 5s forwards;transition:opacity .45s}
+#introCv.gone{opacity:0;pointer-events:none}
+@keyframes introHide{to{opacity:0;visibility:hidden}}
 #vDone{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px}
 #vDone.on{display:flex}
 #vDone .vd{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;max-width:360px;width:100%;display:flex;flex-direction:column;gap:12px}
@@ -220,6 +223,7 @@ body.focus #focus{display:block}
 </style>
 </head>
 <body>
+<canvas id="introCv" aria-hidden="true"></canvas>
 <div id="app">
 <header>
   <h1>Drifting<span>Chords</span></h1>
@@ -342,6 +346,7 @@ body.focus #focus{display:block}
   <section class="tab" id="tab-sound">
     <div class="box">
       <div class="row">
+        <label><input type="checkbox" id="introChk"> Intro beim Start</label>
         <label>Sprache <select id="langSel"><option value="de">Deutsch</option><option value="en">English</option></select></label>
         <label>Figuren <select id="figSel"><option value="">keine</option><option value="cycle">Lichtrenner</option><option value="boat">Boote</option><option value="deer">Rentiere 🎄</option><option value="dino">Dinos 🦕</option></select></label>
         <label>Farben <select id="themeSel"><option value="Neon">Neon</option><option value="Eis">Eis</option><option value="Glut">Glut</option><option value="Lila">Lila</option><option value="Mono">Mono</option></select></label>
@@ -3296,6 +3301,70 @@ els.loopDel.addEventListener('click', () => {
 /* ---------- Video-Modus: Hochformat-Ansicht zum Aufnehmen ---------- */
 var videoOn = false, vRecorder = null, lastVideo = null;
 ['video','vCanvas','vPlay','vRec','vPasses','vTheme','vClose','videoBtn','fVideo','themeSel','vDone','vDoneInfo','vShare','vSave','vDoneClose'].forEach(id => els[id] = document.getElementById(id));
+// ---------- Intro: fünf Logo-Wellen zeichnen sich, leuchten auf, dann erscheint der Name ----------
+const INTRO_SEC = 3.0;
+function drawIntro(g, W, H, t){
+  const s = Math.min(W, H * 0.62) / 360, cx = W / 2, cy = H / 2 - 30 * s;
+  const cl = x => x < 0 ? 0 : x > 1 ? 1 : x;
+  g.save();
+  g.fillStyle = '#0b0a12'; g.fillRect(0, 0, W, H);
+  const zoom = 1 + 0.06 * ease(cl((t - 1.0) / 2.0));
+  g.translate(cx, cy); g.scale(zoom, zoom); g.translate(-cx, -cy);
+  const glow = cl((t - 0.7) / 0.8);
+  if (glow > 0){
+    const rg = g.createRadialGradient(cx, cy, 0, cx, cy, 230 * s);
+    rg.addColorStop(0, `rgba(160,140,255,${0.13 * glow})`); rg.addColorStop(1, 'rgba(160,140,255,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, W, H);
+  }
+  // Wellen: erst eine kleinere, dann eine höhere Anhebung (wie das Logo)
+  const ww = 230 * s, x0 = cx - ww / 2, N = 90;
+  const shape = (u, i) => cy + (i - 2) * 10 * s - 48 * s * (1 - i * 0.07) * (0.45 * Math.exp(-(((u - 0.32) / 0.11) ** 2)) + Math.exp(-(((u - 0.66) / 0.12) ** 2)));
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let i = 0; i < 5; i++){
+    const pr = ease(cl((t - 0.1 - i * 0.12) / 1.0)); if (pr <= 0) continue;
+    const col = VOICE_COLORS[i % VOICE_COLORS.length], n = Math.max(1, Math.round(N * pr));
+    g.beginPath();
+    for (let k = 0; k <= n; k++){ const u = k / N; k ? g.lineTo(x0 + u * ww, shape(u, i)) : g.moveTo(x0 + u * ww, shape(u, i)); }
+    g.strokeStyle = col; g.globalAlpha = 0.18 + 0.2 * glow; g.lineWidth = 10 * s; g.stroke();
+    g.globalAlpha = 1; g.lineWidth = 3 * s; g.stroke();
+    if (pr < 1){ const u = n / N; g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x0 + u * ww, shape(u, i), 3.4 * s, 0, Math.PI * 2); g.fill(); }
+  }
+  // kurzer Lichtblitz, wenn alle Wellen fertig sind
+  const fl = cl(1 - Math.abs(t - 1.45) / 0.18);
+  if (fl > 0){ g.globalAlpha = fl * 0.12; g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
+  // Name: Buchstaben rücken zusammen
+  const tp = ease(cl((t - 1.25) / 0.8));
+  if (tp > 0){
+    const txt = 'Drifting Chords', sp = (9 - 7 * tp) * s;
+    g.font = `700 ${30 * s}px system-ui, sans-serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
+    const ws = [...txt].map(ch => g.measureText(ch).width), tw = ws.reduce((a, b) => a + b, 0) + sp * (txt.length - 1);
+    let x = cx - tw / 2; g.globalAlpha = tp; g.fillStyle = '#ffffff';
+    [...txt].forEach((ch, i) => { g.fillText(ch, x, cy + 70 * s); x += ws[i] + sp; });
+  }
+  const sl = cl((t - 1.8) / 0.6);
+  if (sl > 0){ g.globalAlpha = sl * 0.75; g.fillStyle = '#ece9f7'; g.textAlign = 'center'; g.font = `500 ${13 * s}px system-ui, sans-serif`; g.fillText('Harmony in endless motion.', cx, cy + 100 * s); }
+  g.restore();
+}
+// Markenklang: ein Akkord, dessen Töne von unten in den ersten Akkord des Loops gleiten
+function brandSound(t, root, minor){
+  if (!ctx || !engine) return;
+  const c = ctx, out = c.createGain(), lp = c.createBiquadFilter();
+  lp.type = 'lowpass'; lp.Q.value = 0.7;
+  lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(3400, t + 1.6); lp.frequency.exponentialRampToValueAtTime(1100, t + 3.2);
+  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(0.3, t + 0.6); out.gain.setValueAtTime(0.3, t + 1.9); out.gain.exponentialRampToValueAtTime(0.0001, t + 3.3);
+  lp.connect(out); out.connect(engine.master); try { out.connect(engine.verb); } catch(e){}
+  const base = 36 + (((root ?? 2) % 12) + 12) % 12, tg = [0, 7, minor ? 15 : 16, 19, 26, 31], drop = [7, 12, 5, 10, 4, 9];
+  tg.forEach((iv, i) => {
+    const to = mtof(base + iv), from = mtof(base + iv - drop[i]), st = t + i * 0.09, gl = 1.15;
+    const curve = new Float32Array(32); for (let k = 0; k < 32; k++) curve[k] = from * Math.pow(to / from, ease(k / 31));
+    const vg = c.createGain(); vg.gain.value = 0.11; vg.connect(lp);
+    [['sawtooth', -7], ['triangle', 7]].forEach(([w, d]) => {
+      const o = c.createOscillator(); o.type = w; o.detune.value = d;
+      o.frequency.setValueAtTime(from, t); o.frequency.setValueCurveAtTime(curve, st, gl);
+      o.connect(vg); o.start(t); o.stop(t + 3.5);
+    });
+  });
+}
 function drawWaves(g, x, y, w, col){            // kleines Logo
   g.save(); g.lineCap = 'round';
   for (let i = 0; i < 4; i++){ g.beginPath();
@@ -3339,8 +3408,10 @@ function drawVideo(){
   g.fillStyle = 'rgba(236,233,247,.55)'; g.font = `500 ${10 * s}px system-ui`; g.fillText('Harmony in endless motion.', 80 * s, 592 * s);
   // Ein-/Ausblenden während der Aufnahme
   if (vRecorder){
-    const now = performance.now(), fin = Math.max(0, 1 - (now - vRecorder.t0) / 900), fout = Math.max(0, Math.min(1, (now - (vRecorder.tEnd - 2200)) / 1800));
-    if (fin > 0){ g.fillStyle = `rgba(0,0,0,${fin})`; g.fillRect(0, 0, W, H); }
+    const now = performance.now(), it = (now - vRecorder.t0) / 1000, fout = Math.max(0, Math.min(1, (now - (vRecorder.tEnd - 2200)) / 1800));
+    if (it < INTRO_SEC){   // Intro, gegen Ende weich in die Linien überblenden
+      g.save(); g.globalAlpha = Math.min(1, Math.max(0, (INTRO_SEC - it) / 0.6)); drawIntro(g, W, H, it); g.restore();
+    }
     if (fout > 0){
       g.fillStyle = `rgba(0,0,0,${fout * 0.82})`; g.fillRect(0, 0, W, H);
       g.globalAlpha = fout; g.textAlign = 'center';
@@ -3373,7 +3444,8 @@ function startVideoRec(){
     len = v.endsWith('s') ? 's' + parseFloat(v) : 'p' + parseFloat(v);
   }
   const num = Math.max(1, Math.min(len[0] === 's' ? 600 : 50, parseFloat(len.slice(1)) || 1));
-  const ms = len[0] === 's' ? num * 1000 : loopSeconds() * num * 1000 + 1500;
+  const INTRO_MS = INTRO_SEC * 1000 - 400;   // der Loop setzt ein, während das Intro ausblendet
+  const ms = (len[0] === 's' ? num * 1000 : loopSeconds() * num * 1000 + 1500) + INTRO_MS;
   let mr;
   try { mr = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 5000000} : undefined); }
   catch(e){ try { mr = new MediaRecorder(stream); } catch(e2){ toast(tr('Video-Aufnahme nicht möglich: ') + (e2.message || e2)); return; } }
@@ -3390,14 +3462,18 @@ function startVideoRec(){
     els.vDone.classList.add('on');
   };
   if (looping) stopLoop();
-  mr.start(1000); startLoop();
-  // Ton weich einblenden und am Ende weich ausblenden
+  if (engine.gate) engine.gateOff(ctx.currentTime + 0.01);
+  mr.start(1000);
+  // Intro mit Markenklang, der in den ersten Akkord gleitet; dann setzt der Loop ein
+  const first = steps.find(x => x.root != null);
   const mg = engine.master.gain, vol = P.volume * 0.8, t = ctx.currentTime, total = ms / 1000;
   engine.recFade = true;
-  ramp(mg, t); mg.setValueAtTime(0.0001, t); mg.linearRampToValueAtTime(vol, t + 1.0);
+  ramp(mg, t); mg.setValueAtTime(vol, t);
+  brandSound(t + 0.1, first ? first.root : 2, first ? QUAL(first.type) === 'min' : false);
+  const loopTimer = setTimeout(() => { if (vRecorder) startLoop(); }, INTRO_MS);
   mg.setValueAtTime(vol, t + Math.max(1.2, total - 2.2)); mg.linearRampToValueAtTime(0.0001, t + Math.max(1.4, total - 0.2));
   const now = performance.now();
-  vRecorder = {mr, t0: now, tEnd: now + ms, timer: setTimeout(() => stopVideoRec(true), ms + 200)};
+  vRecorder = {mr, t0: now, tEnd: now + ms, loopTimer, timer: setTimeout(() => stopVideoRec(true), ms + 200)};
   els.vRec.classList.add('on'); els.vRec.textContent = '■ Stopp';
 }
 function stopVideoRec(immediate){
@@ -3410,7 +3486,7 @@ function stopVideoRec(immediate){
     vRecorder.timer = setTimeout(() => stopVideoRec(true), 1900);
     return;
   }
-  clearTimeout(vRecorder.timer); vRecorder.mr.stop(); vRecorder = null;
+  clearTimeout(vRecorder.timer); clearTimeout(vRecorder.loopTimer); vRecorder.mr.stop(); vRecorder = null;
   els.vRec.classList.remove('on'); els.vRec.textContent = '⏺ Video';
   if (looping) stopLoop();
   if (engine){ engine.recFade = false; const mg = engine.master.gain; ramp(mg, ctx.currentTime); mg.setTargetAtTime(P.volume * 0.8, ctx.currentTime + 0.3, 0.1); }
@@ -3492,7 +3568,7 @@ const EN = {
   'Filter':'Filter','Resonanz':'Resonance','LFO Tempo':'LFO rate','LFO Tiefe':'LFO depth','Effekte':'Effects','Hall':'Reverb','Raumgröße':'Room size','Echo':'Echo','Echo-Rückkopplung':'Echo feedback','Echo-Zeit':'Echo time',
   'Progressive House':'Progressive House','Filter-Hüllkurve':'Filter envelope','Pumpen (Sidechain)':'Pumping (sidechain)','Loop-Bewegung':'Loop movement','Versatz der Stimmen':'Voice offset','Bewegung im Akkord':'Movement in chord',
   'Weiches Pad':'Soft Pad','Glas-Keys':'Glass Keys','Analog-Strings':'Analog Strings','Orgel':'Organ','Dunkler Drone':'Dark Drone',
-  'Filmmusik':'Film score','Urzeit-Abenteuer':'Prehistoric adventure','Weihnachten':'Christmas','Dinos 🦕':'Dinos 🦕','Film: Orchester':'Film: Orchestra','Abenteuer: Hörner':'Adventure: Horns','Weihnachten: Glöckchen':'Christmas: Bells','Rock: Synth-Gitarre':'Rock: Synth guitar',
+  'Filmmusik':'Film score','Intro beim Start':'Intro on start','Urzeit-Abenteuer':'Prehistoric adventure','Weihnachten':'Christmas','Dinos 🦕':'Dinos 🦕','Film: Orchester':'Film: Orchestra','Abenteuer: Hörner':'Adventure: Horns','Weihnachten: Glöckchen':'Christmas: Bells','Rock: Synth-Gitarre':'Rock: Synth guitar',
   'Melancholisch':'Melancholic','Episch':'Epic','Überraschend':'Surprising','Pop':'Pop','Jazz':'Jazz','Lo-Fi':'Lo-Fi','Ambient':'Ambient',
   // Fokus
   'danach weiter':'then next bar','🔍 Takt-Details':'🔍 Bar details','+ weitere Typen':'+ more types','− weniger':'− fewer',
@@ -3610,6 +3686,27 @@ i18nObs.observe(document.body, {subtree:true, childList:true, characterData:true
 // Dialoge übersetzen
 { const c0 = window.confirm.bind(window), p0 = window.prompt.bind(window);
   window.confirm = m => c0(tr(m)); window.prompt = (m, d) => p0(tr(m), d == null ? d : tr(d)); }
+// ---------- Intro beim Öffnen der App ----------
+(function(){
+  const cv = document.getElementById('introCv'), chk = document.getElementById('introChk');
+  let on = true; try { on = localStorage.getItem('chordwave.intro') !== '0'; } catch(e){}
+  chk.checked = on;
+  chk.addEventListener('change', () => { try { localStorage.setItem('chordwave.intro', chk.checked ? '1' : '0'); } catch(e){} });
+  if (!on){ cv.remove(); return; }
+  const dpr = Math.min(2, window.devicePixelRatio || 1), t0 = performance.now();
+  let done = false;
+  const end = () => { if (done) return; done = true; cv.classList.add('gone'); setTimeout(() => cv.remove(), 500); };
+  cv.addEventListener('pointerdown', end);
+  const frame = now => {
+    if (done) return;
+    const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+    const t = (now - t0) / 1000;
+    drawIntro(cv.getContext('2d'), W, H, Math.min(t, INTRO_SEC));
+    if (t >= INTRO_SEC - 0.35) end(); else requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+})();
 els.langSel = document.getElementById('langSel');
 els.langSel.addEventListener('change', () => {
   LANG = els.langSel.value;
