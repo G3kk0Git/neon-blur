@@ -193,7 +193,8 @@ body.focus #focus{display:block}
 .vbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .vbar button,.vbar select{height:40px}
 #vRec.on{background:var(--warn);border-color:var(--warn);color:#0b0a12}
-#introCv{position:fixed;inset:0;width:100%;height:100%;z-index:50;background:#0b0a12;animation:introHide .4s 5s forwards;transition:opacity .45s}
+#introCv{position:fixed;inset:0;width:100%;height:100%;z-index:50;background:#0b0a12;animation:introHide .4s 7s forwards;transition:opacity .45s}
+#introCv.replay{animation:none}
 #introCv.gone{opacity:0;pointer-events:none}
 @keyframes introHide{to{opacity:0;visibility:hidden}}
 #vDone{display:none;position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px}
@@ -347,6 +348,8 @@ body.focus #focus{display:block}
     <div class="box">
       <div class="row">
         <label><input type="checkbox" id="introChk"> Intro beim Start</label>
+        <button id="introPlay">▶ Intro ansehen</button>
+        <span class="hint" id="appVer" data-build="__BUILD__"></span>
         <label>Sprache <select id="langSel"><option value="de">Deutsch</option><option value="en">English</option></select></label>
         <label>Figuren <select id="figSel"><option value="">keine</option><option value="cycle">Lichtrenner</option><option value="boat">Boote</option><option value="deer">Rentiere 🎄</option><option value="dino">Dinos 🦕</option></select></label>
         <label>Farben <select id="themeSel"><option value="Neon">Neon</option><option value="Eis">Eis</option><option value="Glut">Glut</option><option value="Lila">Lila</option><option value="Mono">Mono</option></select></label>
@@ -3318,7 +3321,11 @@ function drawIntro(g, W, H, t){
   }
   // Wellen: erst eine kleinere, dann eine höhere Anhebung (wie das Logo)
   const ww = 230 * s, x0 = cx - ww / 2, N = 90;
-  const shape = (u, i) => cy + (i - 2) * 10 * s - 48 * s * (1 - i * 0.07) * (0.45 * Math.exp(-(((u - 0.32) / 0.11) ** 2)) + Math.exp(-(((u - 0.66) / 0.12) ** 2)));
+  // Erst fünf einzelne Stimmen, die wie bei einem Akkordwechsel gleiten – dann verschmelzen sie zum Logo
+  const logo = (u, i) => cy + (i - 2) * 10 * s - 48 * s * (1 - i * 0.07) * (0.45 * Math.exp(-(((u - 0.32) / 0.11) ** 2)) + Math.exp(-(((u - 0.66) / 0.12) ** 2)));
+  const voice = (u, i) => cy + (i - 2) * 30 * s + [-22, 14, -10, 18, -14][i] * s * ease(cl((u - 0.45) / 0.18));
+  const mix = ease(cl((t - 0.85) / 0.9));
+  const shape = (u, i) => voice(u, i) + (logo(u, i) - voice(u, i)) * mix;
   g.lineCap = 'round'; g.lineJoin = 'round';
   for (let i = 0; i < 5; i++){
     const pr = ease(cl((t - 0.1 - i * 0.12) / 1.0)); if (pr <= 0) continue;
@@ -3568,7 +3575,7 @@ const EN = {
   'Filter':'Filter','Resonanz':'Resonance','LFO Tempo':'LFO rate','LFO Tiefe':'LFO depth','Effekte':'Effects','Hall':'Reverb','Raumgröße':'Room size','Echo':'Echo','Echo-Rückkopplung':'Echo feedback','Echo-Zeit':'Echo time',
   'Progressive House':'Progressive House','Filter-Hüllkurve':'Filter envelope','Pumpen (Sidechain)':'Pumping (sidechain)','Loop-Bewegung':'Loop movement','Versatz der Stimmen':'Voice offset','Bewegung im Akkord':'Movement in chord',
   'Weiches Pad':'Soft Pad','Glas-Keys':'Glass Keys','Analog-Strings':'Analog Strings','Orgel':'Organ','Dunkler Drone':'Dark Drone',
-  'Filmmusik':'Film score','Intro beim Start':'Intro on start','Urzeit-Abenteuer':'Prehistoric adventure','Weihnachten':'Christmas','Dinos 🦕':'Dinos 🦕','Film: Orchester':'Film: Orchestra','Abenteuer: Hörner':'Adventure: Horns','Weihnachten: Glöckchen':'Christmas: Bells','Rock: Synth-Gitarre':'Rock: Synth guitar',
+  'Filmmusik':'Film score','Intro beim Start':'Intro on start','▶ Intro ansehen':'▶ Watch intro','Urzeit-Abenteuer':'Prehistoric adventure','Weihnachten':'Christmas','Dinos 🦕':'Dinos 🦕','Film: Orchester':'Film: Orchestra','Abenteuer: Hörner':'Adventure: Horns','Weihnachten: Glöckchen':'Christmas: Bells','Rock: Synth-Gitarre':'Rock: Synth guitar',
   'Melancholisch':'Melancholic','Episch':'Epic','Überraschend':'Surprising','Pop':'Pop','Jazz':'Jazz','Lo-Fi':'Lo-Fi','Ambient':'Ambient',
   // Fokus
   'danach weiter':'then next bar','🔍 Takt-Details':'🔍 Bar details','+ weitere Typen':'+ more types','− weniger':'− fewer',
@@ -3686,26 +3693,42 @@ i18nObs.observe(document.body, {subtree:true, childList:true, characterData:true
 // Dialoge übersetzen
 { const c0 = window.confirm.bind(window), p0 = window.prompt.bind(window);
   window.confirm = m => c0(tr(m)); window.prompt = (m, d) => p0(tr(m), d == null ? d : tr(d)); }
-// ---------- Intro beim Öffnen der App ----------
+// ---------- Intro beim Öffnen der App (und jederzeit über „Intro ansehen“) ----------
+function playIntro(cv, replay){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  let done = false, t0 = 0;
+  const end = () => { if (done) return; done = true; cv.classList.add('gone'); setTimeout(() => cv.remove(), 500); };
+  cv.addEventListener('pointerdown', end);
+  const frame = now => {
+    if (done) return;
+    if (!t0) t0 = now;
+    const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
+    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+    const t = (now - t0) / 1000;
+    drawIntro(cv.getContext('2d'), W, H, Math.min(t, INTRO_SEC));
+    if (t >= INTRO_SEC + 0.4) end(); else requestAnimationFrame(frame);
+  };
+  // erst starten, wenn die Seite wirklich sichtbar ist (sonst läuft das Intro unter dem Android-Startbild ab)
+  const go = () => setTimeout(() => requestAnimationFrame(frame), replay ? 0 : 350);
+  if (replay || (document.readyState === 'complete' && !document.hidden)) go();
+  else {
+    const wait = () => { if (document.readyState === 'complete' && !document.hidden){ removeEventListener('load', wait); document.removeEventListener('visibilitychange', wait); go(); } };
+    addEventListener('load', wait); document.addEventListener('visibilitychange', wait);
+  }
+}
 (function(){
   const cv = document.getElementById('introCv'), chk = document.getElementById('introChk');
   let on = true; try { on = localStorage.getItem('chordwave.intro') !== '0'; } catch(e){}
   chk.checked = on;
   chk.addEventListener('change', () => { try { localStorage.setItem('chordwave.intro', chk.checked ? '1' : '0'); } catch(e){} });
-  if (!on){ cv.remove(); return; }
-  const dpr = Math.min(2, window.devicePixelRatio || 1), t0 = performance.now();
-  let done = false;
-  const end = () => { if (done) return; done = true; cv.classList.add('gone'); setTimeout(() => cv.remove(), 500); };
-  cv.addEventListener('pointerdown', end);
-  const frame = now => {
-    if (done) return;
-    const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
-    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
-    const t = (now - t0) / 1000;
-    drawIntro(cv.getContext('2d'), W, H, Math.min(t, INTRO_SEC));
-    if (t >= INTRO_SEC - 0.35) end(); else requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
+  if (on) playIntro(cv, false); else cv.remove();
+  document.getElementById('introPlay').addEventListener('click', () => {
+    const c = document.createElement('canvas'); c.id = 'introCv'; c.className = 'replay'; document.body.append(c);
+    ensureAudio(); brandSound(ctx.currentTime + 0.1, curRoot ?? 2, QUAL(curType) === 'min');   // hier darf Ton laufen (du hast getippt)
+    playIntro(c, true);
+  });
+  const ver = document.getElementById('appVer'), b = ver.dataset.build;
+  ver.textContent = 'Version ' + (b && !b.includes('BUILD') ? b : 'Web');
 })();
 els.langSel = document.getElementById('langSel');
 els.langSel.addEventListener('change', () => {
