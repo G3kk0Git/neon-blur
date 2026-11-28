@@ -1,0 +1,52 @@
+# Erzeugt EINMALIG den geheimen Veröffentlichungs-Schlüssel für Drifting Chords.
+# Voraussetzung: Secret RELEASE_KEY_PASSWORD (Settings → Secrets and variables → Actions).
+# Ergebnis: android-res/release.keystore.enc – mit deinem Passwort verschlüsselt (AES-256),
+# ohne Passwort wertlos. Der unverschlüsselte Schlüssel verlässt den GitHub-Rechner nie.
+name: Release-Schlüssel erzeugen
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/release-key.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  key:
+    runs-on: ubuntu-latest
+    env:
+      REL_PW: ${{ secrets.RELEASE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Prüfen
+        run: |
+          if [ -z "$REL_PW" ]; then echo "::error::Secret RELEASE_KEY_PASSWORD fehlt."; exit 1; fi
+          if [ ${#REL_PW} -lt 12 ]; then echo "::error::Passwort zu kurz (mindestens 12 Zeichen)."; exit 1; fi
+          if [ -f android-res/release.keystore.enc ]; then echo "::error::Es gibt schon einen Schlüssel – wird nicht überschrieben."; exit 1; fi
+
+      - name: Schlüssel erzeugen und verschlüsseln
+        run: |
+          K="$RUNNER_TEMP/release.jks"
+          keytool -genkeypair -noprompt -keystore "$K" -storetype PKCS12 -alias driftingchords \
+            -keyalg RSA -keysize 4096 -validity 10000 \
+            -storepass:env REL_PW -keypass:env REL_PW -dname "CN=Drifting Chords, C=CH"
+          echo "Fingerabdruck (öffentlich, für die Play Console):"
+          keytool -list -v -keystore "$K" -storepass:env REL_PW | grep -E "SHA256:" || true
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$K" -out android-res/release.keystore.enc -pass env:REL_PW
+          rm -f "$K"
+
+      - name: Verschlüsselten Schlüssel speichern
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add android-res/release.keystore.enc
+          git commit -m "Verschlüsselten Release-Schlüssel hinzufügen"
+          git push

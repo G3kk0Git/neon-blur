@@ -7,6 +7,8 @@ on:
     paths:
       - 'chordwave/**'
       - 'android-res/**'
+      - 'tools/**'
+      - 'package.json'
       - '.github/workflows/android-apk.yml'
   workflow_dispatch:
 
@@ -16,6 +18,8 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      REL_PW: ${{ secrets.RELEASE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +37,8 @@ jobs:
           mkdir apk && cd apk
           npm init -y > /dev/null
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6
-          mkdir www && cp -r ../chordwave/* www/
+          # verschleierte Fassung der App (Kommentare weg, Namen und Texte unkenntlich)
+          (cd .. && npm install --no-audit --no-fund && node tools/build-web.mjs apk/www)
           sed -i "s/__BUILD__/1.0.${GITHUB_RUN_NUMBER}/" www/index.html
           cat > capacitor.config.json <<'JSON'
           {
@@ -84,6 +89,23 @@ jobs:
               }
           }
           GRADLE
+          # Veröffentlichungs-Signatur (nur wenn der geheime Schlüssel eingerichtet ist)
+          cat >> apk/android/app/build.gradle <<'GRADLE'
+
+          if (System.getenv("REL_KS")) {
+              android {
+                  signingConfigs {
+                      release {
+                          storeFile file(System.getenv("REL_KS"))
+                          storePassword System.getenv("REL_PW")
+                          keyAlias "driftingchords"
+                          keyPassword System.getenv("REL_PW")
+                      }
+                  }
+                  buildTypes { release { signingConfig signingConfigs.release } }
+              }
+          }
+          GRADLE
 
       - name: APK bauen
         env:
@@ -94,6 +116,27 @@ jobs:
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/DriftingChords-1.0.${GITHUB_RUN_NUMBER}.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/DriftingChords.apk"
+
+      # Play-Store-Fassung (AAB) + signierte APK mit dem geheimen Schlüssel – nur als privates Artefakt, nie öffentlich
+      - name: Veröffentlichungs-Fassung bauen
+        if: env.REL_PW != '' && hashFiles('android-res/release.keystore.enc') != ''
+        run: |
+          export REL_KS="$RUNNER_TEMP/release.jks"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in android-res/release.keystore.enc -out "$REL_KS" -pass env:REL_PW
+          cd apk/android
+          ./gradlew bundleRelease assembleRelease --no-daemon
+          mkdir -p "$GITHUB_WORKSPACE/release-out"
+          cp app/build/outputs/bundle/release/app-release.aab "$GITHUB_WORKSPACE/release-out/DriftingChords-1.0.${GITHUB_RUN_NUMBER}.aab"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/release-out/DriftingChords-1.0.${GITHUB_RUN_NUMBER}-release.apk"
+          rm -f "$REL_KS"
+
+      - name: Veröffentlichungs-Fassung sichern (privat)
+        if: env.REL_PW != '' && hashFiles('android-res/release.keystore.enc') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: DriftingChords-PlayStore
+          path: release-out/*
+          retention-days: 30
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,8 +1,12 @@
-# Netlify-Konfiguration für diesen Branch: Chordwave aus dem Unterordner ausliefern.
+# Netlify-Konfiguration: Drifting Chords wird verschleiert gebaut und aus dist/ ausgeliefert.
 # (Hat Vorrang vor den Einstellungen in der Netlify-Oberfläche.)
 [build]
-  publish = "chordwave"
-  command = ""
+  # verschleierte Fassung bauen (tools/build-web.mjs) und diese ausliefern
+  publish = "dist"
+  command = "node tools/build-web.mjs dist"
+
+[build.environment]
+  NODE_VERSION = "20"
 
 [[headers]]
   for = "/manifest.json"

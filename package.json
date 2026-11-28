@@ -1,0 +1,11 @@
+{
+  "name": "drifting-chords-build",
+  "private": true,
+  "description": "Build-Werkzeug: erzeugt die verschleierte Version von Drifting Chords (Web + APK).",
+  "license": "UNLICENSED",
+  "scripts": { "build": "node tools/build-web.mjs dist" },
+  "devDependencies": {
+    "terser": "5.36.0",
+    "javascript-obfuscator": "4.1.1"
+  }
+}
