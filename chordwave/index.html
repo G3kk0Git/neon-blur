@@ -347,7 +347,6 @@ body.focus #focus{display:block}
   <section class="tab" id="tab-sound">
     <div class="box">
       <div class="row">
-        <label><input type="checkbox" id="introChk"> Intro beim Start</label>
         <button id="introPlay">▶ Intro ansehen</button>
         <span class="hint" id="appVer" data-build="__BUILD__"></span>
         <label>Sprache <select id="langSel"><option value="de">Deutsch</option><option value="en">English</option></select></label>
@@ -3332,7 +3331,7 @@ function drawIntro(g, W, H, t){
   const ww = 230 * s, x0 = cx - ww / 2, N = 90;
   // Erst fünf einzelne Stimmen, die wie bei einem Akkordwechsel gleiten – dann verschmelzen sie zum Logo
   const logo = (u, i) => cy + (i - 2) * 11 * s + logoWave(u) * 0.62 * s;
-  const voice = (u, i) => cy + (i - 2) * 30 * s + [-22, 14, -10, 18, -14][i] * s * ease(cl((u - 0.45) / 0.18));
+  const voice = (u, i) => cy + (i - 2) * 30 * s + SIG_JUMP[i] * s * ease(cl((u - 0.45) / 0.18));
   const mix = ease(cl((t - 0.85) / 0.9));
   const shape = (u, i) => voice(u, i) + (logo(u, i) - voice(u, i)) * mix;
   g.lineCap = 'round'; g.lineJoin = 'round';
@@ -3361,34 +3360,67 @@ function drawIntro(g, W, H, t){
   if (sl > 0){ g.globalAlpha = sl * 0.75; g.fillStyle = '#ece9f7'; g.textAlign = 'center'; g.font = `500 ${13 * s}px system-ui, sans-serif`; g.fillText('Harmony in endless motion.', cx, cy + 116 * s); }
   g.restore();
 }
-// Markenklang: ein Akkord, dessen Töne von unten in den ersten Akkord des Loops gleiten
-function brandSound(t, root, minor){
+// ---------- Signatur-Harmonie „Drifting Chords“ ----------
+// Fünf Stimmen = die fünf Linien des Intros. Gmaj9 → A9sus4 (jede Stimme gleitet genau dann, wenn ihre Linie springt)
+// → Dmaj9: die Oberstimme steigt eine Quinte (A–H–Fis), der Bass fällt in den Grundton – während die Linien zum Logo verschmelzen.
+const SIG = {
+  a:[69, 66, 62, 59, 55], b:[71, 64, 62, 57, 52], c:[78, 73, 69, 64, 57],
+  bass:[43, 45, 38]
+};
+const SIG_JUMP = SIG.b.map((n, i) => -(n - SIG.a[i]) * 4.5);   // so weit springen die Linien im Bild (Pixel)
+let sigVerb = null;
+function signatureSound(t){
   if (!ctx || !engine) return;
   const c = ctx, out = c.createGain(), lp = c.createBiquadFilter();
-  lp.type = 'lowpass'; lp.Q.value = 0.7;
-  lp.frequency.setValueAtTime(300, t); lp.frequency.exponentialRampToValueAtTime(3400, t + 1.6); lp.frequency.exponentialRampToValueAtTime(1100, t + 3.2);
-  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(0.3, t + 0.6); out.gain.setValueAtTime(0.3, t + 1.9); out.gain.exponentialRampToValueAtTime(0.0001, t + 3.3);
-  lp.connect(out); out.connect(engine.master); try { out.connect(engine.verb); } catch(e){}
-  const base = 36 + (((root ?? 2) % 12) + 12) % 12, tg = [0, 7, minor ? 15 : 16, 19, 26, 31], drop = [7, 12, 5, 10, 4, 9];
-  tg.forEach((iv, i) => {
-    const to = mtof(base + iv), from = mtof(base + iv - drop[i]), st = t + i * 0.09, gl = 1.15;
-    const curve = new Float32Array(32); for (let k = 0; k < 32; k++) curve[k] = from * Math.pow(to / from, ease(k / 31));
-    const vg = c.createGain(); vg.gain.value = 0.11; vg.connect(lp);
-    [['sawtooth', -7], ['triangle', 7]].forEach(([w, d]) => {
+  if (!sigVerb || sigVerb.context !== c){ sigVerb = c.createConvolver(); sigVerb.buffer = makeImpulse(c, 3.2); const vg = c.createGain(); vg.gain.value = 0.55; sigVerb.connect(vg); vg.connect(engine.master); }
+  lp.type = 'lowpass'; lp.Q.value = 0.6;
+  lp.frequency.setValueAtTime(500, t); lp.frequency.exponentialRampToValueAtTime(1400, t + 0.7);
+  lp.frequency.exponentialRampToValueAtTime(4200, t + 1.6); lp.frequency.exponentialRampToValueAtTime(1600, t + 3.6);
+  out.gain.setValueAtTime(0.0001, t); out.gain.linearRampToValueAtTime(0.32, t + 0.45);
+  out.gain.linearRampToValueAtTime(0.42, t + 1.5); out.gain.setValueAtTime(0.42, t + 2.3); out.gain.exponentialRampToValueAtTime(0.0001, t + 4.0);
+  lp.connect(out); out.connect(engine.master); out.connect(sigVerb);
+  const glideTo = (prm, f0, f1, st, dur) => {
+    const cv = new Float32Array(24); for (let k = 0; k < 24; k++) cv[k] = f0 * Math.pow(f1 / f0, ease(k / 23));
+    prm.setValueCurveAtTime(cv, st, dur);
+  };
+  const voice = (notes, starts, durs, waves, level, dest) => {
+    const vg = c.createGain(); vg.gain.value = level; vg.connect(dest);
+    waves.forEach(([w, d]) => {
       const o = c.createOscillator(); o.type = w; o.detune.value = d;
-      o.frequency.setValueAtTime(from, t); o.frequency.setValueCurveAtTime(curve, st, gl);
-      o.connect(vg); o.start(t); o.stop(t + 3.5);
+      o.frequency.setValueAtTime(mtof(notes[0]), t);
+      for (let k = 1; k < notes.length; k++) glideTo(o.frequency, mtof(notes[k - 1]), mtof(notes[k]), starts[k - 1], durs[k - 1]);
+      o.connect(vg); o.start(t); o.stop(t + 4.4);
     });
+  };
+  for (let i = 0; i < 5; i++){
+    // Sprung genau dann, wenn Linie i im Intro ihre Stufe erreicht; danach gemeinsames Aufsteigen zum Logo
+    const bs = t + 0.57 + i * 0.12, cs = Math.max(t + 1.05 + i * 0.06, bs + 0.2);
+    voice([SIG.a[i], SIG.b[i], SIG.c[i]], [bs, cs], [0.18, 0.6],
+          [['sawtooth', -6], ['triangle', 6]], i === 0 ? 0.12 : 0.085, lp);
+  }
+  voice(SIG.bass, [t + 0.6, t + 1.08], [0.25, 0.45], [['triangle', 0], ['sine', -1200]], 0.2, out);
+  // Glanz, wenn das Logo aufleuchtet: zarter Glockenton (Grundton + Quinte, zwei Oktaven höher)
+  [[86, 0.05], [93, 0.03]].forEach(([n, lv]) => {
+    const o = c.createOscillator(), gg = c.createGain(); o.type = 'sine'; o.frequency.value = mtof(n);
+    gg.gain.setValueAtTime(0.0001, t + 1.42); gg.gain.linearRampToValueAtTime(lv, t + 1.45); gg.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
+    o.connect(gg); gg.connect(out); gg.connect(sigVerb); o.start(t + 1.4); o.stop(t + 3.7);
   });
 }
-function drawWaves(g, x, y, w){                  // kleines Logo (wie das App-Icon)
+// beim Öffnen: Ton nur, wenn das Gerät ihn ohne Tippen erlaubt (in der App ja, im Browser meist nicht)
+function introSound(){
+  const t0 = performance.now();
+  try { ensureAudio(); } catch(e){ return; }
+  const go = () => { if (ctx && ctx.state === 'running' && performance.now() - t0 < 400) signatureSound(ctx.currentTime + 0.03); };
+  if (ctx.state === 'running') go(); else ctx.resume().then(go).catch(() => {});
+}
+function drawWaves(g, x, y, w, white){           // kleines Logo (wie das App-Icon; white = edles weißes Logo)
   g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
   const k = w / 345;
   for (let i = 0; i < 5; i++){ g.beginPath();
     for (let j = 0; j <= 48; j++){ const u = j / 48, yy = y + (i - 2) * 21 * k * 0.6 + logoWave(u) * k;
       j ? g.lineTo(x + u * w, yy) : g.moveTo(x + u * w, yy); }
-    g.strokeStyle = '#9d90ff'; g.globalAlpha = 0.25; g.lineWidth = w * 0.06; g.stroke();
-    g.strokeStyle = LOGO_COLS[i]; g.globalAlpha = 1; g.lineWidth = w * 0.022; g.stroke(); }
+    g.strokeStyle = white ? '#ffffff' : '#9d90ff'; g.globalAlpha = white ? 0.1 : 0.25; g.lineWidth = w * 0.06; g.stroke();
+    g.strokeStyle = white ? '#ffffff' : LOGO_COLS[i]; g.globalAlpha = white ? 1 - i * 0.16 : 1; g.lineWidth = w * 0.022; g.stroke(); }
   g.restore();
 }
 function drawVideo(){
@@ -3420,20 +3452,18 @@ function drawVideo(){
   g.textAlign = 'left';
   drawTimeline(g, 0, 122 * s, W, 400 * s, {playFrac:0.37, span:8, scale:s, padTop:24 * s, padBot:16 * s});
   // Fußzeile
-  drawWaves(g, 22 * s, 566 * s, 46 * s, VOICE_COLORS[Math.max(0, P.voices - 1)]);
+  drawWaves(g, 22 * s, 566 * s, 46 * s);
   g.fillStyle = 'rgba(236,233,247,.55)'; g.font = `500 ${10 * s}px system-ui`; g.fillText(tr('Erstellt mit'), 80 * s, 558 * s);
   g.fillStyle = '#ffffff'; g.font = `700 ${16 * s}px system-ui`; g.fillText('Drifting Chords', 80 * s, 577 * s);
   g.fillStyle = 'rgba(236,233,247,.55)'; g.font = `500 ${10 * s}px system-ui`; g.fillText('Harmony in endless motion.', 80 * s, 592 * s);
   // Ein-/Ausblenden während der Aufnahme
   if (vRecorder){
-    const now = performance.now(), it = (now - vRecorder.t0) / 1000, fout = Math.max(0, Math.min(1, (now - (vRecorder.tEnd - 2200)) / 1800));
-    if (it < INTRO_SEC){   // Intro, gegen Ende weich in die Linien überblenden
-      g.save(); g.globalAlpha = Math.min(1, Math.max(0, (INTRO_SEC - it) / 0.6)); drawIntro(g, W, H, it); g.restore();
-    }
+    const now = performance.now(), fin = Math.max(0, 1 - (now - vRecorder.t0) / 1400), fout = Math.max(0, Math.min(1, (now - (vRecorder.tEnd - 2200)) / 1800));
+    if (fin > 0){ g.fillStyle = `rgba(0,0,0,${fin * fin})`; g.fillRect(0, 0, W, H); }   // weich aus dem Schwarz
     if (fout > 0){
       g.fillStyle = `rgba(0,0,0,${fout * 0.82})`; g.fillRect(0, 0, W, H);
       g.globalAlpha = fout; g.textAlign = 'center';
-      drawWaves(g, W / 2 - 50 * s, 290 * s, 100 * s, VOICE_COLORS[Math.max(0, P.voices - 1)]);
+      drawWaves(g, W / 2 - 50 * s, 290 * s, 100 * s, true);
       g.fillStyle = '#ffffff'; g.font = `700 ${26 * s}px system-ui`; g.fillText('Drifting Chords', W / 2, 360 * s);
       g.fillStyle = 'rgba(236,233,247,.7)'; g.font = `500 ${12 * s}px system-ui`; g.fillText('Harmony in endless motion.', W / 2, 382 * s);
       g.fillText('driftingchords.app', W / 2, 402 * s);
@@ -3462,8 +3492,7 @@ function startVideoRec(){
     len = v.endsWith('s') ? 's' + parseFloat(v) : 'p' + parseFloat(v);
   }
   const num = Math.max(1, Math.min(len[0] === 's' ? 600 : 50, parseFloat(len.slice(1)) || 1));
-  const INTRO_MS = INTRO_SEC * 1000 - 400;   // der Loop setzt ein, während das Intro ausblendet
-  const ms = (len[0] === 's' ? num * 1000 : loopSeconds() * num * 1000 + 1500) + INTRO_MS;
+  const ms = len[0] === 's' ? num * 1000 : loopSeconds() * num * 1000 + 1500;
   let mr;
   try { mr = new MediaRecorder(stream, mime ? {mimeType: mime, videoBitsPerSecond: 5000000} : undefined); }
   catch(e){ try { mr = new MediaRecorder(stream); } catch(e2){ toast(tr('Video-Aufnahme nicht möglich: ') + (e2.message || e2)); return; } }
@@ -3480,15 +3509,12 @@ function startVideoRec(){
     els.vDone.classList.add('on');
   };
   if (looping) stopLoop();
-  if (engine.gate) engine.gateOff(ctx.currentTime + 0.01);
-  mr.start(1000);
-  // Intro mit Markenklang, der in den ersten Akkord gleitet; dann setzt der Loop ein
-  const first = steps.find(x => x.root != null);
+  mr.start(1000); startLoop();
+  // Ton weich einblenden und am Ende weich ausblenden
   const mg = engine.master.gain, vol = P.volume * 0.8, t = ctx.currentTime, total = ms / 1000;
   engine.recFade = true;
-  ramp(mg, t); mg.setValueAtTime(vol, t);
-  brandSound(t + 0.1, first ? first.root : 2, first ? QUAL(first.type) === 'min' : false);
-  const loopTimer = setTimeout(() => { if (vRecorder) startLoop(); }, INTRO_MS);
+  ramp(mg, t); mg.setValueAtTime(0.0001, t); mg.linearRampToValueAtTime(vol * 0.35, t + 0.6); mg.linearRampToValueAtTime(vol, t + 1.6);
+  const loopTimer = 0;
   mg.setValueAtTime(vol, t + Math.max(1.2, total - 2.2)); mg.linearRampToValueAtTime(0.0001, t + Math.max(1.4, total - 0.2));
   const now = performance.now();
   vRecorder = {mr, t0: now, tEnd: now + ms, loopTimer, timer: setTimeout(() => stopVideoRec(true), ms + 200)};
@@ -3712,7 +3738,7 @@ function playIntro(cv, replay){
   cv.addEventListener('pointerdown', end);
   const frame = now => {
     if (done) return;
-    if (!t0) t0 = now;
+    if (!t0){ t0 = now; introSound(); }
     const W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr);
     if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
     const t = (now - t0) / 1000;
@@ -3728,15 +3754,10 @@ function playIntro(cv, replay){
   }
 }
 (function(){
-  const cv = document.getElementById('introCv'), chk = document.getElementById('introChk');
-  let on = true; try { on = localStorage.getItem('chordwave.intro') !== '0'; } catch(e){}
-  chk.checked = on;
-  chk.addEventListener('change', () => { try { localStorage.setItem('chordwave.intro', chk.checked ? '1' : '0'); } catch(e){} });
-  if (on) playIntro(cv, false); else cv.remove();
+  playIntro(document.getElementById('introCv'), false);
   document.getElementById('introPlay').addEventListener('click', () => {
     const c = document.createElement('canvas'); c.id = 'introCv'; c.className = 'replay'; document.body.append(c);
-    ensureAudio(); brandSound(ctx.currentTime + 0.1, curRoot ?? 2, QUAL(curType) === 'min');   // hier darf Ton laufen (du hast getippt)
-    playIntro(c, true);
+    ensureAudio(); playIntro(c, true);
   });
   const ver = document.getElementById('appVer'), b = ver.dataset.build;
   ver.textContent = 'Version ' + (b && !b.includes('BUILD') ? b : 'Web');

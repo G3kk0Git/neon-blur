@@ -45,6 +45,21 @@ jobs:
           JSON
           npx cap add android
           npx cap sync android
+          # Startklang ohne vorheriges Tippen erlauben (Intro-Harmonie beim Öffnen)
+          cat > android/app/src/main/java/app/driftingchords/MainActivity.java <<'JAVA'
+          package app.driftingchords;
+
+          import android.os.Bundle;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  this.bridge.getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
+              }
+          }
+          JAVA
 
       - name: Icons, Startbild, Version und Signatur
         run: |
